@@ -1,0 +1,4 @@
+numpy
+pandas
+stl
+boto3
