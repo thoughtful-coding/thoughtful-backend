@@ -1,6 +1,5 @@
 variables:
   PYTHONPATH: "${CI_PROJECT_DIR}/src"
-  AWS_DEFAULT_REGION: us-east-2
   ECR_REPOSITORY: 598791268315.dkr.ecr.us-east-2.amazonaws.com/danieluclsdockerrepository
   IMAGE_TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
 
@@ -46,7 +45,6 @@ deploy:
     - apk add --no-cache python3 py3-pip
     - pip3 install awscli
     - echo "Logging in to Amazon ECR"
-    - aws ecr get-login-password --region ${} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}
+    - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}
     - echo "Pushing Docker image to ECR"
-    - docker push $ECR_REPOSITORY:$IMAGE_TAG
-    - docker push $ECR_REPOSITORY:latest
+    - docker push ${ECR_REPOSITORY}:latest  # Intentionally only have a single, latest image for $$$ sake
