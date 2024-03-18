@@ -6,7 +6,6 @@ variables:
 stages:
   - lint
   - test
-  - build
   - deploy
 
 lint:
@@ -27,30 +26,17 @@ test:
     - python3 -m pytest --cov=aws_src_sample --cov-report term --cov-report=xml:coverage.xml
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
 
-build:
-  stage: build
-  image: docker:19.03.12
-  services:
-    - docker:19.03.12-dind
-  script:
-    - echo "Building Docker image"
-    - docker build -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
-    - docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REPOSITORY}:latest
-
 deploy:
   stage: deploy
   image: docker:19.03.12
   services:
     - docker:19.03.12-dind
   script:
-    - echo "Installing AWS CLI"
     - apk add --no-cache python3 py3-pip
     - pip3 install awscli
-    - echo "Logging in to Amazon ECR"
-    - aws ecr get-login-password --region ${AWS_DEFAULT_REGION}
-    - echo "GOT PASSWORD"
+    - docker build -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
+    - docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REPOSITORY}:latest
     - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}
-    - echo "Pushing Docker image to ECR"
     - docker push ${ECR_REPOSITORY}:latest  # Intentionally only have a single, latest image for $$$ sake
   only:
     - main
