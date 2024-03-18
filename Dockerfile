@@ -9,4 +9,4 @@ RUN pip install -r requirements.txt
 COPY src/ ${LAMBDA_TASK_ROOT}
 
 
-CMD ["aws_src_sample.hello_word.say_hello"]
+CMD ["aws_src_sample.hello_world.say_hello"]
