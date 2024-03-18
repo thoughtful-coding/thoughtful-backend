@@ -51,4 +51,4 @@ deploy:
     - echo "Pushing Docker image to ECR"
     - docker push ${ECR_REPOSITORY}:latest  # Intentionally only have a single, latest image for $$$ sake
   only:
-    - master
+    - main
