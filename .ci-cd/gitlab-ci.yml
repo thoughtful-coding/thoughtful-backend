@@ -1,0 +1,52 @@
+variables:
+  PYTHONPATH: "$CI_PROJECT_DIR/src"
+  AWS_DEFAULT_REGION: us-east-2
+  ECR_REPOSITORY: 598791268315.dkr.ecr.us-east-2.amazonaws.com/danieluclsdockerrepository
+  IMAGE_TAG: $CI_COMMIT_REF_SLUG-$CI_COMMIT_SHORT_SHA
+
+stages:
+  - lint
+  - test
+  - build
+  - deploy
+
+lint:
+  stage: lint
+  image: python:3.10
+  script:
+    - python3 -V  # Print out python version for debugging
+    - python3 -m pip install --upgrade pip
+    - python3 -m pip install black
+    - python3 -m black --check .
+
+test:
+  stage: test
+  image: python:3.10
+  script:
+    - python3 -m pip install --upgrade pip
+    - python3 -m pip install pytest pytest-cov
+    - python3 -m pytest --cov=skeleton --cov-report term --cov-report=xml:coverage.xml
+  coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
+
+build:
+  stage: build
+  image: docker:19.03.12
+  services:
+    - docker:19.03.12-dind
+  script:
+    - echo "Building Docker image"
+    - docker build -t $ECR_REPOSITORY:$IMAGE_TAG .
+    - docker tag $ECR_REPOSITORY:$IMAGE_TAG $ECR_REPOSITORY:latest
+
+deploy:
+  stage: deploy
+  image: docker:19.03.12
+  script:
+    - echo "Installing AWS CLI"
+    - apk add --no-cache python3 py3-pip
+    - pip3 install awscli
+    - echo "Logging in to Amazon ECR"
+    - $(aws ecr get-login --no-include-email --region $AWS_DEFAULT_REGION)
+    - echo "Pushing Docker image to ECR"
+    - docker push $ECR_REPOSITORY:$IMAGE_TAG
+    - docker push $ECR_REPOSITORY:latest
