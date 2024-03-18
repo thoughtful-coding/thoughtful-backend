@@ -45,6 +45,10 @@ deploy:
     - apk add --no-cache python3 py3-pip
     - pip3 install awscli
     - echo "Logging in to Amazon ECR"
+    - aws ecr get-login-password --region ${AWS_DEFAULT_REGION}
+    - echo "GOT PASSWORD"
     - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}
     - echo "Pushing Docker image to ECR"
     - docker push ${ECR_REPOSITORY}:latest  # Intentionally only have a single, latest image for $$$ sake
+  only:
+    - master
