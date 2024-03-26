@@ -16,7 +16,7 @@ lint:
     - python3 -V  # Print out python version for debugging
     - python3 -m pip install --upgrade pip
     - python3 -m pip install black
-    - python3 -m black --check .
+    - python3 -m black --line-length 120 --check .
 
 test:
   stage: test
