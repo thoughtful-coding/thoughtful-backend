@@ -6,6 +6,7 @@ import pandas as pd
 from stl import mesh
 import art
 
+
 from aws_src_sample.s3.object_inputter import ObjectInputter
 from aws_src_sample.s3.object_outputter import ObjectOutputter
 from aws_src_sample.utils.aws_env_vars import get_output_bucket_name, get_file_type_counter_table_name
@@ -14,9 +15,6 @@ from aws_src_sample.dynamodb.file_type_counter_table import FileTypeCounterTable
 
 _LOGGER = logging.getLogger()
 _LOGGER.setLevel(logging.INFO)
-
-
-
 
 
 def create_mesh_helper(input_csv_path: str, output_stl_path: str) -> None:
@@ -67,7 +65,7 @@ def create_mesh(
     object_inputter: ObjectInputter,
     object_outputter: ObjectOutputter,
     input_bucket_name: str,
-    input_bucket_key: str,   
+    input_bucket_key: str,
     output_bucket_name: str,
 ) -> None:
     input_data = object_inputter.get(bucket=input_bucket_name, key=input_bucket_key)
@@ -91,6 +89,7 @@ def create_mesh(
         contents=file_contents,
     )
 
+
 def create_ascii_art(
     object_inputter: ObjectInputter,
     object_outputter: ObjectOutputter,
@@ -98,31 +97,29 @@ def create_ascii_art(
     input_bucket_key: str,
     output_bucket_name: str,
 ) -> None:
-    
-
 
     input_data = object_inputter.get(bucket=input_bucket_name, key=input_bucket_key)
     file_contents = art(input_data)
-    #file_reader_file_name = "temp.txt"
+    # file_reader_file_name = "temp.txt"
 
-    #with open("/tmp/" + file_reader_file_name, "w") as tmp_fp:
+    # with open("/tmp/" + file_reader_file_name, "w") as tmp_fp:
     #    tmp_fp.write(input_data)
 
     output_bucket_key = input_bucket_key[:-4] + ".txt"
-    #temp_input_path = "/tmp/" + file_reader_file_name
-    #temp_output_path = "/tmp/" + output_bucket_key
+    # temp_input_path = "/tmp/" + file_reader_file_name
+    # temp_output_path = "/tmp/" + output_bucket_key
     object_outputter.put(
         bucket=output_bucket_name,
         key=output_bucket_key,
         contents=file_contents,
     )
-    
+
 
 def create_instructions(
     object_inputter: ObjectInputter,
     object_outputter: ObjectOutputter,
     input_bucket_name: str,
-    input_bucket_key: str,  
+    input_bucket_key: str,
     output_bucket_name: str,
 ) -> None:
     object_outputter.put(
@@ -130,9 +127,11 @@ def create_instructions(
         key="instructions.txt",
         contents="lorem ipsum asjhdkajsdhkajshd",
     )
-    
+
+
 FN_INTERFACE = {"csv": create_mesh, "txt": create_ascii_art}
-#FILE_TYPES = {"csv":"stl","txt":"txt"}
+# FILE_TYPES = {"csv":"stl","txt":"txt"}
+
 
 class LambdaHandler:
     def __init__(
@@ -150,13 +149,17 @@ class LambdaHandler:
         input_key = event["Records"][0]["s3"]["object"]["key"]
         output_bucket_name = get_output_bucket_name()
 
-        input_file_type= input_key.split(".")[-1]
+        input_file_type = str(input_key.split(".")[-1])
         # Get our bucket and file name
         if input_file_type not in FN_INTERFACE:
-            create_instructions(self.object_inputter,self.object_outputter,input_bucket,input_key,output_bucket_name)
+            create_instructions(
+                self.object_inputter, self.object_outputter, input_bucket, input_key, output_bucket_name
+            )
         else:
-            FN_INTERFACE[input_file_type](self.object_inputter,self.object_outputter,input_bucket,input_key,output_bucket_name)
-            self.file_type_counter_table.increment(input_file_type)
+            FN_INTERFACE[input_file_type](
+                self.object_inputter, self.object_outputter, input_bucket, input_key, output_bucket_name
+            )
+            self.file_type_counter_table.increment(item_key=input_file_type)
 
         return {"statusCode": 200}
 
