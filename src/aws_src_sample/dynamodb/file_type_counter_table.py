@@ -4,7 +4,7 @@ import boto3
 
 class FileTypeCounterTable:
     def __init__(self, table_name: str) -> None:
-        self.client = boto3.client("dynamodb")
+        self.client = boto3.resource("dynamodb")
         self.table = self.client.Table(table_name)
 
     def get_value(self, *, item_key: str) -> int:

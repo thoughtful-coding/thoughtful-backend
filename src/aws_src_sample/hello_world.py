@@ -150,12 +150,16 @@ class LambdaHandler:
         output_bucket_name = get_output_bucket_name()
 
         input_file_type = str(input_key.split(".")[-1])
+
         # Get our bucket and file name
+        print("decision", input_file_type)
         if input_file_type not in FN_INTERFACE:
+            print("invalid file")
             create_instructions(
                 self.object_inputter, self.object_outputter, input_bucket, input_key, output_bucket_name
             )
         else:
+            print("valid file", FN_INTERFACE[input_file_type])
             FN_INTERFACE[input_file_type](
                 self.object_inputter, self.object_outputter, input_bucket, input_key, output_bucket_name
             )
@@ -165,6 +169,7 @@ class LambdaHandler:
 
 
 def lambda_handler(event: dict, context) -> dict:
+
     _LOGGER.info(event)
 
     lh = LambdaHandler(
