@@ -99,7 +99,8 @@ def create_ascii_art(
 ) -> None:
 
     input_data = object_inputter.get(bucket=input_bucket_name, key=input_bucket_key)
-    file_contents = art.art(input_data)
+    # file_contents = art.art(input_data)
+    file_contents = "hi: " + input_data
     # file_reader_file_name = "temp.txt"
 
     # with open("/tmp/" + file_reader_file_name, "w") as tmp_fp:
