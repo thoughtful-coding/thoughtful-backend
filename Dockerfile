@@ -9,4 +9,4 @@ RUN pip install -r requirements.txt
 COPY src/ ${LAMBDA_TASK_ROOT}
 
 
-CMD ["aws_src_sample.hello_world.lambda_handler"]
+CMD ["aws_src_sample.lambdas.s3_put_lambda.s3_put_lambda_handler"]

@@ -55,14 +55,14 @@ class S3PutLambdaHandler:
         output_bucket_name = get_output_bucket_name()
 
         # Get our bucket and file name
-        _LOGGER.info("decision", input_file_type)
+        _LOGGER.info(f"decision: {input_file_type}")
         if input_file_type not in FN_INTERFACE:
             _LOGGER.info("invalid file")
             create_instructions(
                 self.object_inputter, self.object_outputter, input_bucket, input_key, output_bucket_name
             )
         else:
-            _LOGGER.info("valid file", FN_INTERFACE[input_file_type])
+            _LOGGER.info(f"valid file: {FN_INTERFACE[input_file_type]}")
             input_data = self.object_inputter.get(bucket=input_bucket, key=input_key)
 
             output_data = FN_INTERFACE[input_file_type].transform(input_data)
@@ -76,7 +76,6 @@ class S3PutLambdaHandler:
 
 
 def s3_put_lambda_handler(event: dict, context) -> dict:
-
     _LOGGER.info(event)
 
     lh = S3PutLambdaHandler(

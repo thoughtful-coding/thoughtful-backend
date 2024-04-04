@@ -3,10 +3,15 @@ import json
 import logging
 import random
 
+from aws_src_sample.dynamodb.file_type_counter_table import FileTypeCounterTable
 from aws_src_sample.s3.object_outputter import ObjectOutputter
 from aws_src_sample.transformers.csv_to_stl import CSVToSTLTransformer
 from aws_src_sample.utils.apig_utils import get_event_body
-from aws_src_sample.utils.aws_env_vars import get_output_bucket_name, get_region
+from aws_src_sample.utils.aws_env_vars import (
+    get_file_type_counter_table_name,
+    get_output_bucket_name,
+    get_region,
+)
 from aws_src_sample.utils.s3_utils import bucket_name_and_key_to_http_url
 
 _LOGGER = logging.getLogger()
@@ -17,8 +22,10 @@ class APIGPostLambdaHandler:
     def __init__(
         self,
         object_outputter: ObjectOutputter,
+        file_type_counter_table: FileTypeCounterTable,
     ) -> None:
         self.object_outputter = object_outputter
+        self.file_type_counter_table = file_type_counter_table
         self.transformer = CSVToSTLTransformer()
 
     def handle(self, event: dict) -> dict:
@@ -30,6 +37,8 @@ class APIGPostLambdaHandler:
             output_data = self.transformer.transform(input_data)
             self.object_outputter.put(bucket=output_bucket_name, key=output_bucket_key, contents=output_data)
             output_url = bucket_name_and_key_to_http_url(get_region(), output_bucket_name, output_bucket_key)
+
+            self.file_type_counter_table.increment(item_key=self.transformer.get_file_ext()[1:])
 
             return {
                 "statusCode": 201,
@@ -47,10 +56,10 @@ class APIGPostLambdaHandler:
 
 
 def api_post_lambda_handler(event: dict, context) -> dict:
-
     _LOGGER.info(event)
 
     lh = APIGPostLambdaHandler(
         ObjectOutputter(),
+        FileTypeCounterTable(get_file_type_counter_table_name()),
     )
     return lh.handle(event)

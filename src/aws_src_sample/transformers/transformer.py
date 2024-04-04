@@ -2,12 +2,12 @@ import abc
 
 
 class Transformer(abc.ABC):
-    @abc.abstractmethod
     @staticmethod
+    @abc.abstractmethod
     def transform(input_data: bytes) -> bytes:
         raise NotImplementedError
 
-    @abc.abstractmethod
     @staticmethod
+    @abc.abstractmethod
     def get_file_ext() -> str:
         raise NotImplementedError
