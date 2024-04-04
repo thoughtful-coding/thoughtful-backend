@@ -42,6 +42,10 @@ class APIGPostLambdaHandler:
 
             return {
                 "statusCode": 201,
+                "headers": {
+                    "Access-Control-Allow-Origin": "https://holycrap872.github.io",
+                    "Content-Type": "application/json",
+                },
                 "body": json.dumps(
                     {
                         "message": "File processed successfully.",
