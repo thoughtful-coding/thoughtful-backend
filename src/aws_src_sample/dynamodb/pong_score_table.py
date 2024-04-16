@@ -1,4 +1,5 @@
 import boto3
+import json
 
 
 class PongScoreTable:
@@ -20,7 +21,7 @@ class PongScoreTable:
             }
         )
 
-    def get_top_five(self) -> dict:
+    def get_top_five(self):
         response = self.table.scan()
         items = response["Items"]
 
@@ -31,4 +32,5 @@ class PongScoreTable:
         top_scores = sorted_items[:5]
 
         # Format the result as a dictionary
-        return {item["user"]: item["score"] for item in top_scores}
+        result = {item["user"]: item["score"] for item in top_scores}
+        return json.dumps(result)
