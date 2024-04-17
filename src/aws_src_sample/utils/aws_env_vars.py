@@ -12,5 +12,6 @@ def get_file_type_counter_table_name() -> str:
 def get_region() -> str:
     return os.environ["REGION"]
 
+
 def get_pong_score_table_name() -> str:
     return os.environ["PONG_SCORE_TABLE_NAME"]
