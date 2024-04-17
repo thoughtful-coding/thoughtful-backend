@@ -33,4 +33,4 @@ class PongScoreTable:
 
         # Format the result as a dictionary
         result = {item["user"]: item["score"] for item in top_scores}
-        return json.dumps(result)
+        return json.dumps(result).encode("utf-8")

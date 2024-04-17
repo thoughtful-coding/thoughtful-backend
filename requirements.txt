@@ -3,4 +3,3 @@ pandas
 numpy-stl
 boto3
 art
-json
