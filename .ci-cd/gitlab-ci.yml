@@ -1,6 +1,6 @@
 variables:
   PYTHONPATH: "${CI_PROJECT_DIR}/src"
-  ECR_REPOSITORY: 598791268315.dkr.ecr.us-east-2.amazonaws.com/danieluclsdockerrepository
+  ECR_REPOSITORY: 598791268315.dkr.ecr.us-east-2.amazonaws.com/sample_app_src_rep-598791268315-us-east-2
   IMAGE_TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
 
 stages:
