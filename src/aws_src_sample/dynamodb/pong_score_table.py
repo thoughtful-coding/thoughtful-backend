@@ -8,7 +8,6 @@ class PongScoreTable:
         self.table = self.client.Table(table_name)
 
     def get_value(self, *, item_key: str) -> str:
-
         response = self.table.get_item(Key={"user": item_key}).get("Item", {"score": -1})["score"]
 
         return response

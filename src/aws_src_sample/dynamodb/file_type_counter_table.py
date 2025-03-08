@@ -7,13 +7,11 @@ class FileTypeCounterTable:
         self.table = self.client.Table(table_name)
 
     def get_value(self, *, item_key: str) -> int:
-
         response = self.table.get_item(Key={"file_type": item_key}).get("Item", {"count": 0})["count"]
 
         return response
 
     def set_value(self, *, item_key: str, item_value: int) -> None:
-
         self.table.put_item(
             Item={
                 "file_type": item_key,  # Assuming 'id' is your primary key

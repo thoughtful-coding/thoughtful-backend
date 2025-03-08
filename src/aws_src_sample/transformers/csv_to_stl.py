@@ -8,10 +8,8 @@ from aws_src_sample.transformers.transformer import Transformer
 
 
 class CSVToSTLTransformer(Transformer):
-
     @staticmethod
     def _create_mesh_helper(input_csv_path: str, output_stl_path: str) -> None:
-
         # Load your CSV file
         data = pd.read_csv(input_csv_path, header=None)
 
