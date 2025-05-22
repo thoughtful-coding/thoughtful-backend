@@ -113,7 +113,7 @@ class UserProgressApiHandler:
             return _format_lambda_response(500, {"message": f"Failed to update progress: {error_message}"})
 
     def handle(self, event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
-        _LOGGER.info("UserProgressApiHandler.handle invoked. Event path: %s", event.get("path"))
+        _LOGGER.info("UserProgressApiHandler.handle invoked. Event: %s", str(event))
 
         user_id = _get_user_id_from_event(event)
         if not user_id:

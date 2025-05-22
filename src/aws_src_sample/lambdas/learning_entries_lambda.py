@@ -150,7 +150,7 @@ class LearningEntriesApiHandler:
         """
         Main entry point for the handler class.
         """
-        _LOGGER.info("LearningEntriesApiHandler.handle invoked. Event path: %s", event.get("path"))
+        _LOGGER.info("LearningEntriesApiHandler.handle invoked. Event %s", str(event))
 
         user_id = _get_user_id_from_event(event)
         if not user_id:
