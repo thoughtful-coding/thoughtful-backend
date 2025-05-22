@@ -174,7 +174,7 @@ def learning_entries_lambda_handler(
     """
     AWS Lambda entry point.
     """
-    print(event)
+    _LOGGER.warning(event)
 
     try:
         leh = LearningEntriesApiHandler(
