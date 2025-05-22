@@ -133,6 +133,7 @@ class UserProgressApiHandler:
 
 def user_progress_lambda_handler(event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
     _LOGGER.debug("Global user_progress_lambda_handler received event.")
+    print(event)
     try:
         uplh = UserProgressApiHandler(UserProgressTable(get_user_progress_table_name()))
         return uplh.handle(event, context)
