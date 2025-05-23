@@ -1,7 +1,7 @@
 variables:
   PYTHONPATH: "${CI_PROJECT_DIR}/src"
   ECR_REPOSITORY: 598791268315.dkr.ecr.us-east-2.amazonaws.com/sample_app_src_rep-598791268315-us-east-2
-  IMAGE_TAG: ${CI_COMMIT_REF_SLUG}-${CI_COMMIT_SHORT_SHA}
+  IMAGE_TAG: ${CI_COMMIT_SHORT_SHA}
 
 stages:
   - lint
@@ -36,14 +36,25 @@ deploy:
     - apk add --no-cache python3 py3-pip
     - pip3 install awscli
     - docker build -t ${ECR_REPOSITORY}:${IMAGE_TAG} .
-    - docker tag ${ECR_REPOSITORY}:${IMAGE_TAG} ${ECR_REPOSITORY}:latest
     - aws ecr get-login-password --region ${AWS_DEFAULT_REGION} | docker login --username AWS --password-stdin ${ECR_REPOSITORY}
-    - docker push ${ECR_REPOSITORY}:latest  # Intentionally only have a single, latest image for $$$ sake
+    - docker push ${ECR_REPOSITORY}:${IMAGE_TAG}
   only:
     - main
 
 trigger:
   stage: trigger
-  image: python:3.12
+  image: curlimages/curl:latest
   script:
-    - curl --request POST --form token=${INFRA_TRIGGER_TOKEN} --form ref=main "https://gitlab.com/api/v4/projects/53267064/trigger/pipeline"
+    - |
+      if [ -z "${IMAGE_TAG}" ]; then
+        echo "Error: IMAGE_TAG is not defined. Cannot trigger infra pipeline."
+        exit 1
+      fi
+      echo "Triggering infrastructure pipeline for main branch with IMAGE_TAG=${IMAGE_TAG}"
+      curl --request POST \
+           --form token="${INFRA_TRIGGER_TOKEN}" \
+           --form ref="main" \
+           --form "variables[IMAGE_TAG_SHA]"="${IMAGE_TAG}"
+           "https://gitlab.com/api/v4/projects/53267064/trigger/pipeline"
+  only:
+    - main
