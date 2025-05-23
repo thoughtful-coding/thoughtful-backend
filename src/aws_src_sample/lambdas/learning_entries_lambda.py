@@ -10,54 +10,14 @@ from aws_src_sample.dynamodb.learning_entries_table import (
     LearningEntryModel,
     LearningEntrySubmissionPayloadModel,
 )
+from aws_src_sample.utils.apig_utils import (
+    format_lambda_response,
+    get_user_id_from_event,
+)
 from aws_src_sample.utils.aws_env_vars import get_learning_entries_table_name
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
-
-
-def _get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[str]:
-    """
-    Extracts user ID from the Lambda event context from an API Gateway authorizer.
-    ADAPT THIS TO YOUR SPECIFIC AUTHORIZER CONFIGURATION.
-    """
-    try:
-        # Example for JWT-based authorizer (like Cognito) where 'sub' is the user ID
-        user_id = event.get("requestContext", {}).get("authorizer", {}).get("claims", {}).get("sub")
-        if user_id:
-            return str(user_id)
-
-        user_id = event.get("requestContext", {}).get("authorizer", {}).get("principalId")
-        if user_id:
-            return str(user_id)
-
-        _LOGGER.warning("User ID not found via 'claims.sub' or 'principalId' in authorizer context.")
-        return None
-    except Exception as e:
-        _LOGGER.error("Error extracting user_id from event: %s", str(e))
-        return None
-
-
-def _format_lambda_response(
-    status_code: int,
-    body: typing.Any,
-    additional_headers: typing.Optional[dict[str, str]] = None,
-) -> dict[str, typing.Any]:
-    """Helper to format API Gateway proxy integration responses."""
-    headers = {
-        "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",  # IMPORTANT: Restrict this in production!
-        "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
-        "Access-Control-Allow-Methods": "OPTIONS,POST,GET,PUT,DELETE,PATCH",
-    }
-    if additional_headers:
-        headers.update(additional_headers)
-
-    return {
-        "statusCode": status_code,
-        "headers": headers,
-        "body": json.dumps(body) if body is not None else None,
-    }
 
 
 class LearningEntriesApiHandler:
@@ -78,7 +38,7 @@ class LearningEntriesApiHandler:
         try:
             body_str = event.get("body")
             if not body_str:
-                return _format_lambda_response(400, {"message": "Missing request body."})
+                return format_lambda_response(400, {"message": "Missing request body."})
 
             raw_payload = json.loads(body_str)
             entry_payload = LearningEntrySubmissionPayloadModel.model_validate(raw_payload)
@@ -86,7 +46,7 @@ class LearningEntriesApiHandler:
 
             created_entry_model = self.db_wrapper.add_entry(user_id=user_id, payload=entry_payload)
 
-            return _format_lambda_response(
+            return format_lambda_response(
                 201,
                 {
                     "success": True,
@@ -97,13 +57,13 @@ class LearningEntriesApiHandler:
 
         except json.JSONDecodeError:
             _LOGGER.exception("Invalid JSON in POST request body.")
-            return _format_lambda_response(400, {"message": "Invalid JSON format in request body."})
+            return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
         except ValidationError as ve:
             _LOGGER.warning("Invalid request payload: %s", ve.errors())
-            return _format_lambda_response(400, {"message": "Invalid request payload.", "details": ve.errors()})
+            return format_lambda_response(400, {"message": "Invalid request payload.", "details": ve.errors()})
         except ValueError as ve:
             _LOGGER.warning("Value error creating entry: %s", str(ve))
-            return _format_lambda_response(400, {"message": str(ve)})
+            return format_lambda_response(400, {"message": str(ve)})
         except Exception as e:
             _LOGGER.exception("Unexpected error handling POST request.")
             # Avoid leaking too many details in general exceptions if ClientError from DDB wrapper is not caught specifically
@@ -112,7 +72,7 @@ class LearningEntriesApiHandler:
                 hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]
             ):  # Boto3 ClientError
                 error_message = f"Database error: {e.response['Error']['Message']}"
-            return _format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
+            return format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
 
     def _handle_get_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
         _LOGGER.info("Handler: Processing GET request for user_id: %s", user_id)
@@ -135,7 +95,7 @@ class LearningEntriesApiHandler:
             )
 
             response_items = [entry.model_dump() for entry in entry_models]
-            return _format_lambda_response(200, response_items)
+            return format_lambda_response(200, response_items)
 
         except Exception as e:
             _LOGGER.exception("Unexpected error handling GET request.")
@@ -144,7 +104,7 @@ class LearningEntriesApiHandler:
                 hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]
             ):  # Boto3 ClientError
                 error_message = f"Database error: {e.response['Error']['Message']}"
-            return _format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
+            return format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
 
     def handle(self, event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
         """
@@ -152,9 +112,9 @@ class LearningEntriesApiHandler:
         """
         _LOGGER.info("LearningEntriesApiHandler.handle invoked. Event %s", str(event))
 
-        user_id = _get_user_id_from_event(event)
+        user_id = get_user_id_from_event(event)
         if not user_id:
-            return _format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
+            return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
 
         http_method = event.get("httpMethod", "").upper()
         _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
@@ -165,7 +125,7 @@ class LearningEntriesApiHandler:
             return self._handle_get_request(event, user_id)
         else:
             _LOGGER.warning("Unsupported HTTP method received: %s", http_method)
-            return _format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed."})
+            return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed."})
 
 
 def learning_entries_lambda_handler(
@@ -184,4 +144,4 @@ def learning_entries_lambda_handler(
     except Exception as e:
         # Catch-all for errors during handler instantiation (e.g., table name env var missing)
         _LOGGER.critical("Critical error in global handler or instantiation: %s", str(e), exc_info=True)
-        return _format_lambda_response(500, {"message": f"Internal server error: {str(e)}"})
+        return format_lambda_response(500, {"message": f"Internal server error: {str(e)}"})
