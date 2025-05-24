@@ -63,21 +63,33 @@ def test_learning_entries_api_handler_handle_get_2():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.get_entries_by_user.return_value = []
+    learning_entries_table.get_entries_by_user.return_value = [
+        LearningEntryModel(
+            userId="e",
+            entryId="uuid_h",
+            submissionTopic="Things to think",
+            submissionCode="for i in range",
+            submissionExplanation="goes around",
+            aiFeedback="Good job",
+            aiAssessment="MOSTLY",
+            createdAt="2025-05-26",
+        )
+    ]
     ret = LearningEntriesApiHandler(learning_entries_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
-    body_dict = json.loads(response["body"])
-    assert body_dict["userId"] == "l"
-    assert body_dict["completion"] == {"m": {}}
+    body_list = json.loads(response["body"])
+    assert len(body_list) == 1
+    assert body_list[0]["userId"] == "e"
+    assert body_list[0]["entryId"] == "uuid_h"
 
 
-def test_learning_entries_api_handler_handle_put_1():
+def test_learning_entries_api_handler_handle_post_1():
     """
     Handle missing body
     """
-    event = {"requestContext": {"http": {"method": "PUT"}}}
+    event = {"requestContext": {"http": {"method": "POST"}}}
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
