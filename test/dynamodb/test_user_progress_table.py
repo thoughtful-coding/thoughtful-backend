@@ -118,7 +118,7 @@ def test_update_progress_empty(user_progress_table_instance: UserProgressTable, 
 
 
 @mock_aws
-def test_update_progress_single(user_progress_table_instance: UserProgressTable, dynamodb_table_object) -> None:
+def test_update_progress_single_update(user_progress_table_instance: UserProgressTable, dynamodb_table_object) -> None:
     """
     Test updating progress with single completion.
     """
@@ -130,4 +130,65 @@ def test_update_progress_single(user_progress_table_instance: UserProgressTable,
     assert result is not None
     assert result.userId == user_id
     assert "l1" in result.completion
-    assert set(result.completion["l1"]) == {"s1", "section2"}
+    assert set(result.completion["l1"]) == {"s1"}
+
+
+@mock_aws
+def test_update_progress_triple_update(user_progress_table_instance: UserProgressTable, dynamodb_table_object) -> None:
+    """
+    Test updating progress multiple "updates"
+    """
+    user_id = "test-user-123"
+
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s1")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s2")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s3")])
+    result = user_progress_table_instance.get_progress(user_id)
+
+    assert result is not None
+    assert result.userId == user_id
+    assert "l1" in result.completion
+    assert set(result.completion["l1"]) == {"s1", "s2", "s3"}
+
+
+@mock_aws
+def test_update_progress_multi_lesson_updates(
+    user_progress_table_instance: UserProgressTable, dynamodb_table_object
+) -> None:
+    user_id = "test-user-123"
+
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s1")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s2")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l2", sectionId="s1")])
+    result = user_progress_table_instance.get_progress(user_id)
+
+    assert result is not None
+    assert result.userId == user_id
+    assert "l1" in result.completion
+    assert set(result.completion["l1"]) == {"s1", "s2"}
+
+    assert "l2" in result.completion
+    assert set(result.completion["l2"]) == {"s1"}
+
+
+@mock_aws
+def test_update_progress_big_update(user_progress_table_instance: UserProgressTable, dynamodb_table_object) -> None:
+    user_id = "test-user-123"
+
+    user_progress_table_instance.update_progress(
+        user_id,
+        [
+            SectionCompletionModel(lessonId="l1", sectionId="s1"),
+            SectionCompletionModel(lessonId="l1", sectionId="s2"),
+            SectionCompletionModel(lessonId="l2", sectionId="s1"),
+        ],
+    )
+    result = user_progress_table_instance.get_progress(user_id)
+
+    assert result is not None
+    assert result.userId == user_id
+    assert "l1" in result.completion
+    assert set(result.completion["l1"]) == {"s1", "s2"}
+
+    assert "l2" in result.completion
+    assert set(result.completion["l2"]) == {"s1"}

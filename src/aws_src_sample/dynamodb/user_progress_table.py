@@ -4,7 +4,7 @@ from datetime import datetime, timezone
 
 import boto3
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, Field
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -13,7 +13,6 @@ _LOGGER.setLevel(logging.INFO)
 class SectionCompletionModel(BaseModel):
     lessonId: str
     sectionId: str
-    timeFirstCompleted: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class BatchCompletionsInputModel(BaseModel):
@@ -22,13 +21,8 @@ class BatchCompletionsInputModel(BaseModel):
 
 class UserProgressModel(BaseModel):
     userId: str
+    # completion structure: lessonId -> sectionId -> timeFirstCompleted
     completion: dict[str, dict[str, str]] = Field(default_factory=dict)
-
-    @field_validator("completion", mode="before")
-    @classmethod
-    def convert_dynamodb_maps(cls, v: typing.Any) -> typing.Any:
-        """Handle DynamoDB data conversion if needed."""
-        return v
 
 
 class UserProgressTable:
@@ -67,13 +61,18 @@ class UserProgressTable:
         """
         Updates user's progress by adding new section completions.
         Only adds completions for sections that haven't been completed before (preserves first completion time).
+        Server sets the timeFirstCompleted timestamp for new completions.
         :param user_id: The ID of the user.
         :param completions_to_add: A list of SectionCompletionModel objects.
         :return: The updated UserProgressModel.
         """
         _LOGGER.info("Updating progress for user_id: %s with %d new completions.", user_id, len(completions_to_add))
 
-        if not completions_to_add:  # If no new completions, just ensure user exists
+        # Server generates the timestamp for when these completions are processed
+        completion_timestamp = datetime.now(timezone.utc).isoformat()
+
+        if not completions_to_add:
+            # Just ensure user exists with empty completion map
             try:
                 response = self.table.update_item(
                     Key={"userId": user_id},
@@ -84,7 +83,8 @@ class UserProgressTable:
                 updated_item = response.get("Attributes", {})
                 if updated_item:
                     return UserProgressModel.model_validate(updated_item)
-                # If item didn't exist, create a minimal one
+
+                # Fallback: create new user
                 new_progress = UserProgressModel(userId=user_id)
                 self.table.put_item(Item=new_progress.model_dump())
                 return new_progress
@@ -95,57 +95,67 @@ class UserProgressTable:
                 raise
 
         try:
-            # Build SET expressions for new completions
-            # Structure: completion.lessonId.sectionId = timeFirstCompleted (only if not exists)
-            set_expressions: list[str] = ["completion = if_not_exists(completion, :empty_map)"]
-            expression_attribute_values: dict[str, typing.Any] = {":empty_map": {}}
-            expression_attribute_names: dict[str, str] = {}
+            # Step 1: Ensure completion map exists
+            self.table.update_item(
+                Key={"userId": user_id},
+                UpdateExpression="SET completion = if_not_exists(completion, :empty_map)",
+                ExpressionAttributeValues={":empty_map": {}},
+                ReturnValues="NONE",
+            )
 
-            # Group by lesson for cleaner attribute naming
-            lessons_processed = set()
+            # Step 2: Initialize lesson maps for unique lessons
+            unique_lessons = list(set(comp.lessonId for comp in completions_to_add))
 
-            for i, comp in enumerate(completions_to_add):
-                lesson_placeholder = f"#lesson_{i}"
-                section_placeholder = f"#section_{i}"
-                timestamp_placeholder = f":timestamp_{i}"
+            if unique_lessons:
+                lesson_expressions = []
+                lesson_values = {}
+                lesson_names = {}
 
-                expression_attribute_names[lesson_placeholder] = comp.lessonId
-                expression_attribute_names[section_placeholder] = comp.sectionId
-                expression_attribute_values[timestamp_placeholder] = comp.timeFirstCompleted
+                for i, lesson_id in enumerate(unique_lessons):
+                    lesson_placeholder = f"#lesson{i}"
+                    lesson_map_placeholder = f":empty_lesson_map{i}"
 
-                # First ensure the lesson map exists if this is the first section we're adding for this lesson
-                if comp.lessonId not in lessons_processed:
-                    lesson_map_placeholder = f":empty_lesson_map_{len(lessons_processed)}"
-                    set_expressions.append(
+                    lesson_names[lesson_placeholder] = lesson_id
+                    lesson_expressions.append(
                         f"completion.{lesson_placeholder} = if_not_exists(completion.{lesson_placeholder}, {lesson_map_placeholder})"
                     )
-                    expression_attribute_values[lesson_map_placeholder] = {}
-                    lessons_processed.add(comp.lessonId)
+                    lesson_values[lesson_map_placeholder] = {}
 
-                # Then set the specific section completion time (only if not already completed)
-                set_expressions.append(
+                self.table.update_item(
+                    Key={"userId": user_id},
+                    UpdateExpression="SET " + ", ".join(lesson_expressions),
+                    ExpressionAttributeValues=lesson_values,
+                    ExpressionAttributeNames=lesson_names,
+                    ReturnValues="NONE",
+                )
+
+            # Step 3: Set individual section completion times
+            section_expressions = []
+            section_values = {}
+            section_names = {}
+
+            for i, comp in enumerate(completions_to_add):
+                lesson_placeholder = f"#lesson{i}"
+                section_placeholder = f"#section{i}"
+                timestamp_placeholder = f":timestamp{i}"
+
+                section_names[lesson_placeholder] = comp.lessonId
+                section_names[section_placeholder] = comp.sectionId
+                section_values[timestamp_placeholder] = completion_timestamp
+
+                section_expressions.append(
                     f"completion.{lesson_placeholder}.{section_placeholder} = if_not_exists(completion.{lesson_placeholder}.{section_placeholder}, {timestamp_placeholder})"
                 )
 
-            final_update_expression = "SET " + ", ".join(set_expressions)
+            response = self.table.update_item(
+                Key={"userId": user_id},
+                UpdateExpression="SET " + ", ".join(section_expressions),
+                ExpressionAttributeValues=section_values,
+                ExpressionAttributeNames=section_names,
+                ReturnValues="ALL_NEW",
+            )
 
-            _LOGGER.debug("DynamoDB UpdateItem for user_id %s:", user_id)
-            _LOGGER.debug("  UpdateExpression: %s", final_update_expression)
-            _LOGGER.debug("  ExpressionAttributeValues: %s", str(expression_attribute_values))
-            _LOGGER.debug("  ExpressionAttributeNames: %s", str(expression_attribute_names))
-
-            update_params = {
-                "Key": {"userId": user_id},
-                "UpdateExpression": final_update_expression,
-                "ExpressionAttributeValues": expression_attribute_values,
-                "ReturnValues": "ALL_NEW",
-            }
-            if expression_attribute_names:
-                update_params["ExpressionAttributeNames"] = expression_attribute_names
-
-            response = self.table.update_item(**update_params)
             updated_item = response.get("Attributes", {})
-
             if not updated_item:
                 _LOGGER.error("UpdateItem did not return attributes for user_id: %s", user_id)
                 return self.get_progress(user_id) or UserProgressModel(userId=user_id)
