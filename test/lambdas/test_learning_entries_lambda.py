@@ -3,7 +3,7 @@ import json
 import os
 from unittest.mock import Mock
 
-from aws_src_sample.dynamodb.learning_entries_table import LearningEntryModel
+from aws_src_sample.dynamodb.learning_entries_table import LearningEntryResponseModel
 from aws_src_sample.lambdas.learning_entries_lambda import LearningEntriesApiHandler
 
 
@@ -64,7 +64,7 @@ def test_learning_entries_api_handler_handle_get_2():
 
     learning_entries_table = Mock()
     learning_entries_table.get_entries_by_user.return_value = [
-        LearningEntryModel(
+        LearningEntryResponseModel(
             userId="e",
             entryId="uuid_h",
             submissionTopic="Things to think",
@@ -125,13 +125,12 @@ def test_learning_entries_api_handler_handle_post_3():
         "submissionExplanation": "goes around",
         "aiFeedback": "Good job",
         "aiAssessment": "mostly",
-        "createdAt": "2025-05-26",
     }
     event = {"requestContext": {"http": {"method": "POST"}}, "body": json.dumps(entry_json)}
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.add_entry.return_value = LearningEntryModel(
+    learning_entries_table.add_entry.return_value = LearningEntryResponseModel(
         userId="e",
         entryId="uuid_h",
         submissionTopic="Things to think",

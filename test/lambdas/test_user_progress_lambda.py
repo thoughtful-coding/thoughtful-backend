@@ -3,7 +3,7 @@ import json
 import os
 from unittest.mock import Mock
 
-from aws_src_sample.dynamodb.user_progress_table import UserProgressModel
+from aws_src_sample.dynamodb.user_progress_table import UserProgressResponseModel
 from aws_src_sample.lambdas.user_progress_lambda import UserProgressApiHandler
 
 
@@ -64,7 +64,7 @@ def test_user_progress_api_handler_handle_get_2():
     add_authorizier_info(event, "e")
 
     user_progress_table = Mock()
-    user_progress_table.get_progress.return_value = UserProgressModel(userId="l", completion={"m": {}})
+    user_progress_table.get_progress.return_value = UserProgressResponseModel(userId="l", completion={"m": {}})
     ret = UserProgressApiHandler(user_progress_table)
     response = ret.handle(event)
 
@@ -115,7 +115,7 @@ def test_user_progress_api_handler_handle_put_3():
     add_authorizier_info(event, "e")
 
     user_progress_table = Mock()
-    user_progress_table.update_progress.return_value = UserProgressModel(userId="l", completion={"m": {}})
+    user_progress_table.update_progress.return_value = UserProgressResponseModel(userId="l", completion={"m": {}})
     ret = UserProgressApiHandler(user_progress_table)
     response = ret.handle(event)
 

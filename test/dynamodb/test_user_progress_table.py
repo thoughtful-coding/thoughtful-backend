@@ -6,9 +6,7 @@ import pytest
 from moto import mock_aws
 
 from aws_src_sample.dynamodb.user_progress_table import (
-    BatchCompletionsInputModel,
     SectionCompletionModel,
-    UserProgressModel,
     UserProgressTable,
 )
 

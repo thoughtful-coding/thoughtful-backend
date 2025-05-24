@@ -7,7 +7,7 @@ from pydantic import ValidationError
 
 from aws_src_sample.dynamodb.user_progress_table import (
     BatchCompletionsInputModel,
-    UserProgressModel,
+    UserProgressResponseModel,
     UserProgressTable,
 )
 from aws_src_sample.utils.apig_utils import (
@@ -30,7 +30,7 @@ class UserProgressApiHandler:
         try:
             progress_model = self.user_progress_table.get_progress(user_id=user_id)
             if not progress_model:
-                progress_model = UserProgressModel(userId=user_id, completion={}, penaltyEndTime=None)
+                progress_model = UserProgressResponseModel(userId=user_id, completion={})
 
             return format_lambda_response(200, progress_model.model_dump())
         except Exception as e:

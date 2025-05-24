@@ -13,17 +13,15 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
 
 
-# --- Pydantic Model Definitions ---
-class LearningEntrySubmissionModel(BaseModel):  # For validating incoming POST request body
+class LearningEntryInputModel(BaseModel):
     submissionTopic: str
     submissionCode: str
     submissionExplanation: str
     aiFeedback: str
     aiAssessment: typing.Literal["achieves", "mostly", "developing", "insufficient"]
-    createdAt: str  # ISO 8601 string
 
 
-class LearningEntryModel(BaseModel):
+class LearningEntryResponseModel(BaseModel):
     userId: str
     entryId: str
     submissionTopic: str
@@ -39,7 +37,7 @@ class LearningEntriesTable:
         self.client = boto3.resource("dynamodb")
         self.table = self.client.Table(table_name)
 
-    def add_entry(self, user_id: str, payload: LearningEntrySubmissionModel) -> LearningEntryModel:
+    def add_entry(self, user_id: str, payload: LearningEntryInputModel) -> LearningEntryResponseModel:
         """
         Adds a new learning entry to the DynamoDB table.
         :param user_id: The ID of the user submitting the entry.
@@ -52,7 +50,7 @@ class LearningEntriesTable:
         current_timestamp_iso = datetime.now(timezone.utc).isoformat()
 
         # Construct the full entry using Pydantic model for clarity and future validation
-        entry_data = LearningEntryModel(
+        entry_data = LearningEntryResponseModel(
             userId=user_id,
             entryId=entry_id,
             submissionTopic=payload.submissionTopic,
@@ -83,7 +81,7 @@ class LearningEntriesTable:
         user_id: str,
         lesson_id_filter: typing.Optional[str] = None,
         section_id_filter: typing.Optional[str] = None,
-    ) -> list[LearningEntryModel]:
+    ) -> list[LearningEntryResponseModel]:
         """
         Retrieves learning entries for a given user, with optional filters.
         Returns a list of Pydantic LearningEntryModel instances.
@@ -122,10 +120,10 @@ class LearningEntriesTable:
                 db_items.extend(response.get("Items", []))
 
             # Parse DynamoDB items into Pydantic models
-            parsed_entries: list[LearningEntryModel] = []
+            parsed_entries: list[LearningEntryResponseModel] = []
             for item in db_items:
                 try:
-                    parsed_entries.append(LearningEntryModel.model_validate(item))
+                    parsed_entries.append(LearningEntryResponseModel.model_validate(item))
                 except Exception as e_parse:  # Pydantic's ValidationError
                     _LOGGER.error(
                         "Failed to parse DynamoDB item into LearningEntryModel: %s. Item: %s", str(e_parse), item
