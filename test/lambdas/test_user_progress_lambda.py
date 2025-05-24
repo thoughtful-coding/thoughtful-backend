@@ -57,7 +57,6 @@ def test_user_progress_api_handler_handle_get_1():
     body_dict = json.loads(response["body"])
     assert body_dict["userId"] == "e"
     assert body_dict["completion"] == {}
-    assert body_dict["penaltyEndTime"] == None
 
 
 def test_user_progress_api_handler_handle_get_2():
@@ -65,15 +64,14 @@ def test_user_progress_api_handler_handle_get_2():
     add_authorizier_info(event, "e")
 
     user_progress_table = Mock()
-    user_progress_table.get_progress.return_value = UserProgressModel(userId="l", completion={"m": []})
+    user_progress_table.get_progress.return_value = UserProgressModel(userId="l", completion={"m": {}})
     ret = UserProgressApiHandler(user_progress_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
     body_dict = json.loads(response["body"])
     assert body_dict["userId"] == "l"
-    assert body_dict["completion"] == {"m": []}
-    assert body_dict["penaltyEndTime"] == None
+    assert body_dict["completion"] == {"m": {}}
 
 
 def test_user_progress_api_handler_handle_put_1():
@@ -117,12 +115,11 @@ def test_user_progress_api_handler_handle_put_3():
     add_authorizier_info(event, "e")
 
     user_progress_table = Mock()
-    user_progress_table.update_progress.return_value = UserProgressModel(userId="l", completion={"m": []})
+    user_progress_table.update_progress.return_value = UserProgressModel(userId="l", completion={"m": {}})
     ret = UserProgressApiHandler(user_progress_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
     body_dict = json.loads(response["body"])
     assert body_dict["userId"] == "l"
-    assert body_dict["completion"] == {"m": []}
-    assert body_dict["penaltyEndTime"] == None
+    assert body_dict["completion"] == {"m": {}}

@@ -4,3 +4,6 @@ numpy-stl
 boto3
 art
 pydantic
+pytest
+moto
+moto[dynamodb]

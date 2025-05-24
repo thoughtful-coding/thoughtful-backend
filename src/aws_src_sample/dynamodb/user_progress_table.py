@@ -13,6 +13,7 @@ _LOGGER.setLevel(logging.INFO)
 class SectionCompletionModel(BaseModel):
     lessonId: str
     sectionId: str
+    timeFirstCompleted: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
 
 
 class BatchCompletionsInputModel(BaseModel):
@@ -21,16 +22,12 @@ class BatchCompletionsInputModel(BaseModel):
 
 class UserProgressModel(BaseModel):
     userId: str
-    completion: dict[str, list[str]] = Field(default_factory=dict)  # lessonId -> list of sectionIds
-    penaltyEndTime: typing.Optional[int] = None  # Unix timestamp in ms
-    lastModifiedServerTimestamp: str = Field(default_factory=lambda: datetime.now(timezone.utc).isoformat())
+    completion: dict[str, dict[str, str]] = Field(default_factory=dict)
 
     @field_validator("completion", mode="before")
     @classmethod
-    def convert_dynamodb_sets_to_lists(cls, v: typing.Any) -> typing.Any:
-        """Converts DynamoDB Set objects to Python lists if coming from DDB."""
-        if isinstance(v, dict):
-            return {key: list(value) if isinstance(value, set) else value for key, value in v.items()}
+    def convert_dynamodb_maps(cls, v: typing.Any) -> typing.Any:
+        """Handle DynamoDB data conversion if needed."""
         return v
 
 
@@ -54,7 +51,6 @@ class UserProgressTable:
             response = self.table.get_item(Key={"userId": user_id})
             item = response.get("Item")
             if item:
-                # Pydantic will handle conversion of DDB sets in completion map via validator
                 return UserProgressModel.model_validate(item)
             _LOGGER.info("No progress found for user_id: %s", user_id)
             return None
@@ -63,89 +59,82 @@ class UserProgressTable:
                 "Failed to get progress for user_id %s from DynamoDB: %s", user_id, e.response["Error"]["Message"]
             )
             raise
-        except Exception as e_val:  # Catch Pydantic validation errors too
+        except Exception as e_val:
             _LOGGER.exception("Failed to validate progress data for user_id %s from DynamoDB: %s", user_id, str(e_val))
-            # Potentially return None or re-raise depending on how strict you want to be with existing data
             return None
 
     def update_progress(self, user_id: str, completions_to_add: list[SectionCompletionModel]) -> UserProgressModel:
         """
         Updates user's progress by adding new section completions.
-        This operation is additive (union) for completed sections.
+        Only adds completions for sections that haven't been completed before (preserves first completion time).
         :param user_id: The ID of the user.
         :param completions_to_add: A list of SectionCompletionModel objects.
         :return: The updated UserProgressModel.
         """
         _LOGGER.info("Updating progress for user_id: %s with %d new completions.", user_id, len(completions_to_add))
 
-        current_timestamp_iso = datetime.now(timezone.utc).isoformat()
-
-        if not completions_to_add:  # If no new completions, only update timestamp
+        if not completions_to_add:  # If no new completions, just ensure user exists
             try:
                 response = self.table.update_item(
                     Key={"userId": user_id},
-                    UpdateExpression="SET lastModifiedServerTimestamp = :ts",
-                    ExpressionAttributeValues={":ts": current_timestamp_iso},
+                    UpdateExpression="SET completion = if_not_exists(completion, :empty_map)",
+                    ExpressionAttributeValues={":empty_map": {}},
                     ReturnValues="ALL_NEW",
                 )
                 updated_item = response.get("Attributes", {})
                 if updated_item:
                     return UserProgressModel.model_validate(updated_item)
                 # If item didn't exist, create a minimal one
-                new_progress = UserProgressModel(userId=user_id, lastModifiedServerTimestamp=current_timestamp_iso)
+                new_progress = UserProgressModel(userId=user_id)
                 self.table.put_item(Item=new_progress.model_dump())
                 return new_progress
             except ClientError as e:
                 _LOGGER.exception(
-                    "Failed to update timestamp for user_id %s: %s", user_id, e.response["Error"]["Message"]
+                    "Failed to ensure user exists for user_id %s: %s", user_id, e.response["Error"]["Message"]
                 )
                 raise
 
-        # Group completions by lessonId for efficient batching of ADD operations
-        updates_by_lesson: dict[str, set[str]] = {}
-        for comp in completions_to_add:
-            if comp.lessonId not in updates_by_lesson:
-                updates_by_lesson[comp.lessonId] = set()
-            updates_by_lesson[comp.lessonId].add(comp.sectionId)
+        try:
+            # Build SET expressions for new completions
+            # Structure: completion.lessonId.sectionId = timeFirstCompleted (only if not exists)
+            set_expressions: list[str] = ["completion = if_not_exists(completion, :empty_map)"]
+            expression_attribute_values: dict[str, typing.Any] = {":empty_map": {}}
+            expression_attribute_names: dict[str, str] = {}
 
-        # Build UpdateExpression and ExpressionAttributeValues/Names
-        set_expressions: list[str] = ["lastModifiedServerTimestamp = :ts"]
-        add_expressions: list[str] = []
-        expression_attribute_values: dict[str, typing.Any] = {":ts": current_timestamp_iso}
-        expression_attribute_names: dict[str, str] = {}
+            # Group by lesson for cleaner attribute naming
+            lessons_processed = set()
 
-        # Ensure 'completion' map exists or is initialized
-        set_expressions.append("completion = if_not_exists(completion, :empty_map)")
-        expression_attribute_values[":empty_map"] = {}
+            for i, comp in enumerate(completions_to_add):
+                lesson_placeholder = f"#lesson_{i}"
+                section_placeholder = f"#section_{i}"
+                timestamp_placeholder = f":timestamp_{i}"
 
-        for i, (lesson_id, section_ids_set) in enumerate(updates_by_lesson.items()):
-            lesson_id_placeholder_name = f"#lesson{i}"
-            section_ids_val_placeholder = f":sections{i}"
+                expression_attribute_names[lesson_placeholder] = comp.lessonId
+                expression_attribute_names[section_placeholder] = comp.sectionId
+                expression_attribute_values[timestamp_placeholder] = comp.timeFirstCompleted
 
-            # For DDB path: completion.lesson_id_with_slashes needs attribute name placeholder
-            expression_attribute_names[lesson_id_placeholder_name] = lesson_id
+                # First ensure the lesson map exists if this is the first section we're adding for this lesson
+                if comp.lessonId not in lessons_processed:
+                    lesson_map_placeholder = f":empty_lesson_map_{len(lessons_processed)}"
+                    set_expressions.append(
+                        f"completion.{lesson_placeholder} = if_not_exists(completion.{lesson_placeholder}, {lesson_map_placeholder})"
+                    )
+                    expression_attribute_values[lesson_map_placeholder] = {}
+                    lessons_processed.add(comp.lessonId)
 
-            # Using ADD action for String Sets
-            add_expressions.append(f"completion.{lesson_id_placeholder_name} {section_ids_val_placeholder}")
-            expression_attribute_values[section_ids_val_placeholder] = section_ids_set
+                # Then set the specific section completion time (only if not already completed)
+                set_expressions.append(
+                    f"completion.{lesson_placeholder}.{section_placeholder} = if_not_exists(completion.{lesson_placeholder}.{section_placeholder}, {timestamp_placeholder})"
+                )
 
-        # Construct the final UpdateExpression with proper syntax
-        update_expression_parts = []
-        if set_expressions:
-            update_expression_parts.append("SET " + ", ".join(set_expressions))
-        if add_expressions:
-            update_expression_parts.append("ADD " + ", ".join(add_expressions))
+            final_update_expression = "SET " + ", ".join(set_expressions)
 
-        final_update_expression = " ".join(update_expression_parts)
-
-        _LOGGER.debug("DynamoDB UpdateItem for user_id %s:", user_id)
-        _LOGGER.debug("  UpdateExpression: %s", final_update_expression)
-        _LOGGER.debug("  ExpressionAttributeValues: %s", str(expression_attribute_values))
-        if expression_attribute_names:
+            _LOGGER.debug("DynamoDB UpdateItem for user_id %s:", user_id)
+            _LOGGER.debug("  UpdateExpression: %s", final_update_expression)
+            _LOGGER.debug("  ExpressionAttributeValues: %s", str(expression_attribute_values))
             _LOGGER.debug("  ExpressionAttributeNames: %s", str(expression_attribute_names))
 
-        try:
-            update_params: dict[str, typing.Any] = {
+            update_params = {
                 "Key": {"userId": user_id},
                 "UpdateExpression": final_update_expression,
                 "ExpressionAttributeValues": expression_attribute_values,
@@ -156,16 +145,13 @@ class UserProgressTable:
 
             response = self.table.update_item(**update_params)
             updated_item = response.get("Attributes", {})
+
             if not updated_item:
                 _LOGGER.error("UpdateItem did not return attributes for user_id: %s", user_id)
-                return self.get_progress(user_id) or UserProgressModel(
-                    userId=user_id,
-                    completion={},
-                    penaltyEndTime=None,
-                    lastModifiedServerTimestamp=current_timestamp_iso,
-                )
+                return self.get_progress(user_id) or UserProgressModel(userId=user_id)
 
             return UserProgressModel.model_validate(updated_item)
+
         except ClientError as e:
             _LOGGER.exception(
                 "Failed to update progress for user_id %s in DynamoDB: %s", user_id, e.response["Error"]["Message"]
