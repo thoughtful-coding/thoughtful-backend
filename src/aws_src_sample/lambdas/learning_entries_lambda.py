@@ -34,6 +34,38 @@ class LearningEntriesApiHandler:
         self.learning_entries_table = learning_entries_table
         _LOGGER.info("LearningEntriesApiHandler initialized.")
 
+    def _handle_get_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
+        _LOGGER.info("Handler: Processing GET request for user_id: %s", user_id)
+        try:
+            query_params = event.get("queryStringParameters") or {}
+            lesson_id_filter = query_params.get("lessonId")
+            section_id_filter = query_params.get("sectionId")
+            _LOGGER.debug("Query params: lessonId=%s, sectionId=%s", lesson_id_filter, section_id_filter)
+
+            target_user_id_for_query = user_id  # Default for student fetching their own
+
+            # Example if path indicates an instructor route and needs different user_id logic
+            # path = event.get("path", "")
+            # if path.startswith("/instructor/") and "studentId" in query_params:
+            #    # Ensure current user (from token via user_id) is an authorized instructor!
+            #    target_user_id_for_query = query_params["studentId"]
+
+            entry_models: list[LearningEntryModel] = self.learning_entries_table.get_entries_by_user(
+                user_id=target_user_id_for_query, lesson_id_filter=lesson_id_filter, section_id_filter=section_id_filter
+            )
+
+            response_items = [entry.model_dump() for entry in entry_models]
+            return format_lambda_response(200, response_items)
+
+        except Exception as e:
+            _LOGGER.exception("Unexpected error handling GET request.")
+            error_message = str(e)
+            if (
+                hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]
+            ):  # Boto3 ClientError
+                error_message = f"Database error: {e.response['Error']['Message']}"
+            return format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
+
     def _handle_post_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
         _LOGGER.info("Handler: Processing POST request for user_id: %s", user_id)
         try:
@@ -75,39 +107,7 @@ class LearningEntriesApiHandler:
                 error_message = f"Database error: {e.response['Error']['Message']}"
             return format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
 
-    def _handle_get_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
-        _LOGGER.info("Handler: Processing GET request for user_id: %s", user_id)
-        try:
-            query_params = event.get("queryStringParameters") or {}
-            lesson_id_filter = query_params.get("lessonId")
-            section_id_filter = query_params.get("sectionId")
-            _LOGGER.debug("Query params: lessonId=%s, sectionId=%s", lesson_id_filter, section_id_filter)
-
-            target_user_id_for_query = user_id  # Default for student fetching their own
-
-            # Example if path indicates an instructor route and needs different user_id logic
-            # path = event.get("path", "")
-            # if path.startswith("/instructor/") and "studentId" in query_params:
-            #    # Ensure current user (from token via user_id) is an authorized instructor!
-            #    target_user_id_for_query = query_params["studentId"]
-
-            entry_models: list[LearningEntryModel] = self.learning_entries_table.get_entries_by_user(
-                user_id=target_user_id_for_query, lesson_id_filter=lesson_id_filter, section_id_filter=section_id_filter
-            )
-
-            response_items = [entry.model_dump() for entry in entry_models]
-            return format_lambda_response(200, response_items)
-
-        except Exception as e:
-            _LOGGER.exception("Unexpected error handling GET request.")
-            error_message = str(e)
-            if (
-                hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]
-            ):  # Boto3 ClientError
-                error_message = f"Database error: {e.response['Error']['Message']}"
-            return format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
-
-    def handle(self, event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
+    def handle(self, event: dict[str, typing.Any]) -> dict[str, typing.Any]:
         """
         Main entry point for the handler class.
         """
@@ -120,10 +120,10 @@ class LearningEntriesApiHandler:
         http_method = get_method(event).upper()
         _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
 
-        if http_method == "POST":
-            return self._handle_post_request(event, user_id)
-        elif http_method == "GET":
+        if http_method == "GET":
             return self._handle_get_request(event, user_id)
+        elif http_method == "POST":
+            return self._handle_post_request(event, user_id)
         else:
             _LOGGER.warning("Unsupported HTTP method received: %s", http_method)
             return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed."})
@@ -141,7 +141,7 @@ def learning_entries_lambda_handler(
         leh = LearningEntriesApiHandler(
             LearningEntriesTable(get_learning_entries_table_name()),
         )
-        return leh.handle(event, context)
+        return leh.handle(event)
     except Exception as e:
         # Catch-all for errors during handler instantiation (e.g., table name env var missing)
         _LOGGER.critical("Critical error in global handler or instantiation: %s", str(e), exc_info=True)
