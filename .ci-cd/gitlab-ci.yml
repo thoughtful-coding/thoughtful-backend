@@ -23,7 +23,7 @@ test:
   image: python:3.12
   script:
     - python3 -m pip install --upgrade pip
-    - python3 -m pip install pytest pytest-cov boto3 numpy pandas numpy-stl art
+    - python3 -m pip install -r requirements.txt
     - python3 -m pytest --cov=aws_src_sample --cov-report term --cov-report=xml:coverage.xml
   coverage: '/(?i)total.*? (100(?:\.0+)?\%|[1-9]?\d(?:\.\d+)?\%)$/'
 
