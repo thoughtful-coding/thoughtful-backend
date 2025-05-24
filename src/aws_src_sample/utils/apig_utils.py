@@ -13,6 +13,10 @@ def get_event_body(event: dict) -> bytes:
         return event["body"].encode("utf-8")
 
 
+def get_method(event: dict) -> str:
+    return event.get("requestContext", {}).get("http", {}).get("method", "UNKNWON")
+
+
 def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[str]:
     """
     Extracts user ID from Lambda event context (adapt to your authorizer).

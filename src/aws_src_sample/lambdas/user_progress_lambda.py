@@ -12,6 +12,7 @@ from aws_src_sample.dynamodb.user_progress_table import (
 )
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
+    get_method,
     get_user_id_from_event,
 )
 from aws_src_sample.utils.aws_env_vars import get_user_progress_table_name
@@ -85,7 +86,7 @@ class UserProgressApiHandler:
         if not user_id:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
 
-        http_method = event.get("httpMethod", "").upper()
+        http_method = get_method(event).upper()
         _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
 
         if http_method == "GET":
