@@ -56,7 +56,7 @@ trigger:
       curl --request POST \
            --form token="${INFRA_TRIGGER_TOKEN}" \
            --form ref="main" \
-           --form "variables[IMAGE_TAG_SHA]"="${IMAGE_TAG}" \
+           --form "variables[IMAGE_TAG]"="${IMAGE_TAG}" \
            "https://gitlab.com/api/v4/projects/53267064/trigger/pipeline"
   only:
     - main
