@@ -1,4 +1,3 @@
-import json
 import logging
 import typing
 from datetime import datetime, timezone
@@ -137,17 +136,15 @@ class UserProgressTable:
             # Using ADD action for String Sets
             # Initialize the lesson's set if it doesn't exist, then add to it
             update_expressions.append(f"ADD completion.{lesson_id_placeholder_name} {section_ids_val_placeholder}")
-            expression_attribute_values[section_ids_val_placeholder] = (
-                section_ids_set  # boto3 handles set conversion for ADD
-            )
+            expression_attribute_values[section_ids_val_placeholder] = section_ids_set
 
         final_update_expression = ", ".join(update_expressions)
 
         _LOGGER.debug("DynamoDB UpdateItem for user_id %s:", user_id)
         _LOGGER.debug("  UpdateExpression: %s", final_update_expression)
-        _LOGGER.debug("  ExpressionAttributeValues: %s", json.dumps(expression_attribute_values))
+        _LOGGER.debug("  ExpressionAttributeValues: %s", str(expression_attribute_values))
         if expression_attribute_names:
-            _LOGGER.debug("  ExpressionAttributeNames: %s", json.dumps(expression_attribute_names))
+            _LOGGER.debug("  ExpressionAttributeNames: %s", str(expression_attribute_names))
 
         try:
             update_params: dict[str, typing.Any] = {

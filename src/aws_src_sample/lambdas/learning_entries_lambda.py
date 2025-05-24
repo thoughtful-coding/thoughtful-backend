@@ -26,12 +26,12 @@ class LearningEntriesApiHandler:
     Handles API requests for learning entries.
     """
 
-    def __init__(self, db_wrapper: LearningEntriesTable) -> None:
+    def __init__(self, learning_entries_table: LearningEntriesTable) -> None:
         """
         Initializes the handler with a DynamoDB wrapper.
-        :param db_wrapper: An instance of LearningEntriesTable for DB operations.
+        :param learning_entries_table: An instance of LearningEntriesTable for DB operations.
         """
-        self.db_wrapper = db_wrapper
+        self.learning_entries_table = learning_entries_table
         _LOGGER.info("LearningEntriesApiHandler initialized.")
 
     def _handle_post_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
@@ -45,7 +45,7 @@ class LearningEntriesApiHandler:
             entry_payload = LearningEntrySubmissionPayloadModel.model_validate(raw_payload)
             _LOGGER.debug("Validated entry_payload: %s", entry_payload.model_dump_json(indent=2))
 
-            created_entry_model = self.db_wrapper.add_entry(user_id=user_id, payload=entry_payload)
+            created_entry_model = self.learning_entries_table.add_entry(user_id=user_id, payload=entry_payload)
 
             return format_lambda_response(
                 201,
@@ -91,7 +91,7 @@ class LearningEntriesApiHandler:
             #    # Ensure current user (from token via user_id) is an authorized instructor!
             #    target_user_id_for_query = query_params["studentId"]
 
-            entry_models: list[LearningEntryModel] = self.db_wrapper.get_entries_by_user(
+            entry_models: list[LearningEntryModel] = self.learning_entries_table.get_entries_by_user(
                 user_id=target_user_id_for_query, lesson_id_filter=lesson_id_filter, section_id_filter=section_id_filter
             )
 

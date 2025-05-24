@@ -24,14 +24,14 @@ _LOGGER.setLevel(logging.INFO)
 class UserProgressApiHandler:
     """Handles API requests for user progress."""
 
-    def __init__(self, db_wrapper: UserProgressTable) -> None:
-        self.db_wrapper = db_wrapper
+    def __init__(self, user_progress_table: UserProgressTable) -> None:
+        self.user_progress_table = user_progress_table
         _LOGGER.info("UserProgressApiHandler initialized.")
 
-    def _handle_get_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
+    def _handle_get_request(self, user_id: str) -> dict[str, typing.Any]:
         _LOGGER.info("Handler: Processing GET /progress for user_id: %s", user_id)
         try:
-            progress_model = self.db_wrapper.get_progress(user_id=user_id)
+            progress_model = self.user_progress_table.get_progress(user_id=user_id)
             if progress_model:
                 return format_lambda_response(200, progress_model.model_dump())
             else:
@@ -60,7 +60,7 @@ class UserProgressApiHandler:
             if not batch_input.completions:  # Empty list is valid, but does nothing but update timestamp
                 _LOGGER.info("Received empty completions list for user_id: %s. Only updating timestamp.", user_id)
 
-            updated_progress_model = self.db_wrapper.update_progress(
+            updated_progress_model = self.user_progress_table.update_progress(
                 user_id=user_id, completions_to_add=batch_input.completions
             )
 
@@ -90,7 +90,7 @@ class UserProgressApiHandler:
         _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
 
         if http_method == "GET":
-            return self._handle_get_request(event, user_id)
+            return self._handle_get_request(user_id)
         elif http_method == "PUT":
             return self._handle_put_request(event, user_id)
         else:
