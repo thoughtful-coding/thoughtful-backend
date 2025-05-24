@@ -10,17 +10,16 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
 
 
-# --- Pydantic Model Definitions ---
 class SectionCompletionModel(BaseModel):
     lessonId: str
     sectionId: str
 
 
-class BatchCompletionsInputModel(BaseModel):  # Corresponds to Swagger
+class BatchCompletionsInputModel(BaseModel):
     completions: list[SectionCompletionModel]
 
 
-class UserProgressModel(BaseModel):  # Corresponds to Swagger UserProgressState
+class UserProgressModel(BaseModel):
     userId: str
     completion: dict[str, list[str]] = Field(default_factory=dict)  # lessonId -> list of sectionIds
     penaltyEndTime: typing.Optional[int] = None  # Unix timestamp in ms
@@ -35,9 +34,6 @@ class UserProgressModel(BaseModel):  # Corresponds to Swagger UserProgressState
         return v
 
 
-# --- End Pydantic Model Definitions ---
-
-
 class UserProgressTable:
     """
     A wrapper class to abstract DynamoDB operations for the UserProgressTable.
@@ -46,7 +42,6 @@ class UserProgressTable:
     def __init__(self, table_name: str) -> None:
         self.client = boto3.resource("dynamodb")
         self.table = self.client.Table(table_name)
-        _LOGGER.info("Initialized UserProgressTable wrapper for table: %s", table_name)
 
     def get_progress(self, user_id: str) -> typing.Optional[UserProgressModel]:
         """

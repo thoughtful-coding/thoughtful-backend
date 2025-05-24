@@ -14,7 +14,7 @@ def get_event_body(event: dict) -> bytes:
 
 
 def get_method(event: dict) -> str:
-    return event.get("requestContext", {}).get("http", {}).get("method", "UNKNWON")
+    return event.get("requestContext", {}).get("http", {}).get("method", "UNKNOWN")
 
 
 def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[str]:
@@ -38,6 +38,7 @@ def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[str]
 def format_lambda_response(
     status_code: int,
     body: typing.Any,
+    *,
     additional_headers: typing.Optional[dict[str, str]] = None,
 ) -> dict[str, typing.Any]:
     """
@@ -45,9 +46,9 @@ def format_lambda_response(
     """
     headers = {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",  # IMPORTANT: Restrict in production
+        "Access-Control-Allow-Origin": "*",  # FIXME: Restrict in production
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
-        "Access-Control-Allow-Methods": "OPTIONS,GET,PUT",  # For /progress route
+        "Access-Control-Allow-Methods": "OPTIONS,GET,PUT",
     }
     if additional_headers:
         headers.update(additional_headers)
