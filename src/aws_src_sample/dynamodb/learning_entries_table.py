@@ -14,26 +14,13 @@ _LOGGER.setLevel(logging.INFO)
 
 
 # --- Pydantic Model Definitions ---
-class ReflectionSubmissionModel(BaseModel):
-    topic: str
-    code: str
-    explanation: str
-    timestamp: int  # Unix epoch ms
-    submitted: bool
-
-
-class ReflectionAssessmentResponseModel(BaseModel):
-    feedback: str
-    assessment: typing.Literal["achieves", "mostly", "developing", "insufficient"]
-    timestamp: int  # Unix epoch ms
-
-
-class LearningEntrySubmissionPayloadModel(BaseModel):  # For validating incoming POST request body
-    lessonId: str
-    sectionId: str
-    sectionTitle: str
-    submission: ReflectionSubmissionModel
-    assessmentResponse: ReflectionAssessmentResponseModel
+class LearningEntrySubmissionModel(BaseModel):  # For validating incoming POST request body
+    submissionTopic: str
+    submissionCode: str
+    submissionExplanation: str
+    aiFeedback: str
+    aiAssessment: typing.Literal["achieves", "mostly", "developing", "insufficient"]
+    createdAt: str  # ISO 8601 string
 
 
 class LearningEntryModel(BaseModel):
@@ -43,7 +30,7 @@ class LearningEntryModel(BaseModel):
     submissionCode: str
     submissionExplanation: str
     aiFeedback: str
-    aiAssessment: str
+    aiAssessment: typing.Literal["achieves", "mostly", "developing", "insufficient"]
     createdAt: str  # ISO 8601 string
 
 
@@ -52,7 +39,7 @@ class LearningEntriesTable:
         self.client = boto3.resource("dynamodb")
         self.table = self.client.Table(table_name)
 
-    def add_entry(self, user_id: str, payload: LearningEntrySubmissionPayloadModel) -> LearningEntryModel:
+    def add_entry(self, user_id: str, payload: LearningEntrySubmissionModel) -> LearningEntryModel:
         """
         Adds a new learning entry to the DynamoDB table.
         :param user_id: The ID of the user submitting the entry.
@@ -68,11 +55,11 @@ class LearningEntriesTable:
         entry_data = LearningEntryModel(
             userId=user_id,
             entryId=entry_id,
-            submissionTopic=payload.submission.topic,
-            submissionCode=payload.submission.code,
-            submissionExplanation=payload.submission.explanation,
-            aiFeedback=payload.assessmentResponse.feedback,
-            aiAssessment=payload.assessmentResponse.assessment,
+            submissionTopic=payload.submissionTopic,
+            submissionCode=payload.submissionCode,
+            submissionExplanation=payload.submissionExplanation,
+            aiFeedback=payload.aiFeedback,
+            aiAssessment=payload.aiAssessment,
             createdAt=current_timestamp_iso,
         )
 

@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from aws_src_sample.dynamodb.learning_entries_table import (
     LearningEntriesTable,
     LearningEntryModel,
-    LearningEntrySubmissionPayloadModel,
+    LearningEntrySubmissionModel,
 )
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
@@ -74,7 +74,7 @@ class LearningEntriesApiHandler:
                 return format_lambda_response(400, {"message": "Missing request body."})
 
             raw_payload = json.loads(body_str)
-            entry_payload = LearningEntrySubmissionPayloadModel.model_validate(raw_payload)
+            entry_payload = LearningEntrySubmissionModel.model_validate(raw_payload)
             _LOGGER.debug("Validated entry_payload: %s", entry_payload.model_dump_json(indent=2))
 
             created_entry_model = self.learning_entries_table.add_entry(user_id=user_id, payload=entry_payload)

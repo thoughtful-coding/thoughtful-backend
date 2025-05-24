@@ -71,7 +71,7 @@ def test_learning_entries_api_handler_handle_get_2():
             submissionCode="for i in range",
             submissionExplanation="goes around",
             aiFeedback="Good job",
-            aiAssessment="MOSTLY",
+            aiAssessment="mostly",
             createdAt="2025-05-26",
         )
     ]
@@ -100,11 +100,11 @@ def test_learning_entries_api_handler_handle_post_1():
     assert response["body"] == '{"message": "Missing request body."}'
 
 
-def test_learning_entries_api_handler_handle_put_2():
+def test_learning_entries_api_handler_handle_post_2():
     """
     Handle bad body
     """
-    event = {"requestContext": {"http": {"method": "PUT"}}, "body": "a"}
+    event = {"requestContext": {"http": {"method": "POST"}}, "body": "a"}
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
@@ -115,22 +115,37 @@ def test_learning_entries_api_handler_handle_put_2():
     assert response["body"] == '{"message": "Invalid JSON format in request body."}'
 
 
-def test_learning_entries_api_handler_handle_put_3():
+def test_learning_entries_api_handler_handle_post_3():
     """
     Handle proper input
     """
-    event = {
-        "requestContext": {"http": {"method": "PUT"}},
-        "body": '{"completions": [{"lessonId": "1", "sectionId": "a"}]}',
+    entry_json = {
+        "submissionTopic": "Things to think",
+        "submissionCode": "for i in range",
+        "submissionExplanation": "goes around",
+        "aiFeedback": "Good job",
+        "aiAssessment": "mostly",
+        "createdAt": "2025-05-26",
     }
+    event = {"requestContext": {"http": {"method": "POST"}}, "body": json.dumps(entry_json)}
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.update_progress.return_value = UserProgressModel(userId="l", completion={"m": {}})
+    learning_entries_table.add_entry.return_value = LearningEntryModel(
+        userId="e",
+        entryId="uuid_h",
+        submissionTopic="Things to think",
+        submissionCode="for i in range",
+        submissionExplanation="goes around",
+        aiFeedback="Good job",
+        aiAssessment="mostly",
+        createdAt="2025-05-26",
+    )
+
     ret = LearningEntriesApiHandler(learning_entries_table)
     response = ret.handle(event)
 
-    assert response["statusCode"] == 200
+    assert response["statusCode"] == 201
     body_dict = json.loads(response["body"])
-    assert body_dict["userId"] == "l"
-    assert body_dict["completion"] == {"m": {}}
+    assert body_dict["success"] == True
+    assert body_dict["message"] == "Learning entry submitted successfully."
