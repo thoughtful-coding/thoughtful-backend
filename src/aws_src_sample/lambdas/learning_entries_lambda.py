@@ -210,7 +210,59 @@ class LearningEntriesApiHandler:
         # As per user: GET /learning-entries is NOT enriched. It returns ReflectionVersionItemModel list.
         return ListOfFinalLearningEntriesResponseModel(entries=final_ddb_items, lastEvaluatedKey=next_last_key)
 
-    # --- Main Handler Method ---
+    def _route_get_request(self, event: dict, user_id: str) -> dict:
+        path = event.get("path", "")
+        path_params = event.get("pathParameters", {})
+        query_params = event.get("queryStringParameters")
+
+        if path == "/learning-entries":
+            response_model = self._handle_get_finalized_entries(user_id, query_params)
+            return format_lambda_response(200, response_model.model_dump(exclude_none=True))
+        elif path_params.get("lessonId") and path_params.get("sectionId") and path.endswith("/reflections"):
+            lesson_id = path_params["lessonId"]
+            section_id = path_params["sectionId"]
+            response_model = self._handle_get_draft_versions(user_id, lesson_id, section_id, query_params)
+            return format_lambda_response(200, response_model.model_dump(exclude_none=True))
+        else:
+            return format_lambda_response(404, {"message": "Resource not found."})
+
+    def _route_post_request(self, event: dict, user_id: str) -> dict:
+        path = event.get("path", "")
+        path_params = event.get("pathParameters", {})
+
+        if path_params.get("lessonId") and path_params.get("sectionId") and path.endswith("/reflections"):
+            lesson_id = path_params["lessonId"]
+            section_id = path_params["sectionId"]
+
+            try:
+                raw_body = event.get("body") or "{}"
+                # Validate request body with Pydantic
+                interaction_input = ReflectionInteractionInputModel.model_validate_json(raw_body)
+            except ValidationError as e:
+                _LOGGER.error(f"Request body validation error: {e.errors()}", exc_info=True)
+                return format_lambda_response(400, {"message": "Invalid request body.", "details": e.errors()})
+            except json.JSONDecodeError:
+                _LOGGER.error("Request body is not valid JSON.", exc_info=True)
+                return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
+
+            if interaction_input.isFinal:
+                # Process final submission
+                final_entry_model = self._process_final_submission(
+                    interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
+                )
+                # Response is the created final ReflectionVersionItemModel
+                return format_lambda_response(201, final_entry_model.model_dump(exclude_none=True))
+            else:
+                # Process draft submission
+                draft_response_model = self._process_draft_submission(
+                    interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
+                )
+                # Response is ReflectionFeedbackAndDraftResponseModel
+                return format_lambda_response(201, draft_response_model.model_dump(exclude_none=True))
+
+        else:
+            return format_lambda_response(404, {"message": "Resource not found."})
+
     def handle(self, event: dict) -> dict:
         _LOGGER.info(f"Handler.handle invoked for path: {event.get('path')}, method: {event.get('httpMethod')}")
         user_id = get_user_id_from_event(event)
@@ -218,61 +270,16 @@ class LearningEntriesApiHandler:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
 
         http_method = event.get("httpMethod")
-        path = event.get("path", "")
-        path_params = event.get("pathParameters", {})
-        query_params = event.get("queryStringParameters")
 
         try:
-            if (
-                http_method == "POST"
-                and path_params.get("lessonId")
-                and path_params.get("sectionId")
-                and path.endswith("/reflections")
-            ):
-                lesson_id = path_params["lessonId"]
-                section_id = path_params["sectionId"]
-
-                try:
-                    raw_body = event.get("body") or "{}"
-                    # Validate request body with Pydantic
-                    interaction_input = ReflectionInteractionInputModel.model_validate_json(raw_body)
-                except ValidationError as e:
-                    _LOGGER.error(f"Request body validation error: {e.errors()}", exc_info=True)
-                    return format_lambda_response(400, {"message": "Invalid request body.", "details": e.errors()})
-                except json.JSONDecodeError:
-                    _LOGGER.error("Request body is not valid JSON.", exc_info=True)
-                    return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
-
-                if interaction_input.isFinal:
-                    # Process final submission
-                    final_entry_model = self._process_final_submission(
-                        interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
-                    )
-                    # Response is the created final ReflectionVersionItemModel
-                    return format_lambda_response(201, final_entry_model.model_dump(exclude_none=True))
-                else:
-                    # Process draft submission
-                    draft_response_model = self._process_draft_submission(
-                        interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
-                    )
-                    # Response is ReflectionFeedbackAndDraftResponseModel
-                    return format_lambda_response(201, draft_response_model.model_dump(exclude_none=True))
-
-            elif http_method == "GET":
-                if path == "/learning-entries":
-                    response_model = self._handle_get_finalized_entries(user_id, query_params)
-                    return format_lambda_response(200, response_model.model_dump(exclude_none=True))
-                elif path_params.get("lessonId") and path_params.get("sectionId") and path.endswith("/reflections"):
-                    lesson_id = path_params["lessonId"]
-                    section_id = path_params["sectionId"]
-                    response_model = self._handle_get_draft_versions(user_id, lesson_id, section_id, query_params)
-                    return format_lambda_response(200, response_model.model_dump(exclude_none=True))
-                else:
-                    return format_lambda_response(404, {"message": "Resource not found."})
+            if http_method == "GET":
+                return self._route_get_request(event, user_id)
+            elif http_method == "PUT":
+                return self._route_post_request(event, user_id)
             else:
-                return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed."})
+                _LOGGER.warning("Unsupported HTTP method for /progress: %s", http_method)
+                return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed on /progress."})
 
-        # Centralized error handling (can be more granular if needed)
         except ValidationError as ve:
             _LOGGER.error(f"Pydantic ValidationError in handler: {str(ve)}", exc_info=True)
             return format_lambda_response(400, {"message": "Invalid data.", "details": ve.errors()})
