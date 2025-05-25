@@ -27,7 +27,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_chatbot_secrets_name,
     get_learning_entries_table_name,
 )
-from aws_src_sample.utils.chatbot_utils import call_google_genai_api
+from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -38,9 +38,12 @@ class LearningEntriesApiHandler:
         self,
         learning_entries_table: LearningEntriesTable,
         chatbot_secrets_manager: ChatBotSecrets,
+        chatbot_wrapper: ChatBotWrapper,
     ):
         self.learning_entries_table = learning_entries_table
         self.chatbot_secrets_manager = chatbot_secrets_manager
+        self.chatbot_wrapper = chatbot_wrapper
+
         chatbot_api_key = self.chatbot_secrets_manager.get_secret_value("CHATBOT_API_KEY")
         if not chatbot_api_key:
             raise ValueError("AI service configuration error (secrets not found during init).")
@@ -59,7 +62,7 @@ class LearningEntriesApiHandler:
         """
         _LOGGER.info(f"Processing DRAFT submission for {user_id}, {lesson_id}#{section_id}")
 
-        ai_response = call_google_genai_api(
+        ai_response = self.chatbot_wrapper.call_api(
             chatbot_api_key=self.chatbot_api_key,
             topic=interaction_input.userTopic,
             code=interaction_input.userCode,
@@ -92,8 +95,8 @@ class LearningEntriesApiHandler:
         # Construct Pydantic response model
         response_model = ReflectionFeedbackAndDraftResponseModel(
             draftEntry=saved_draft_ddb_item,
-            currentAiFeedback=ai_response.aiFeedback,
-            currentAiAssessment=ai_response.aiAssessment,
+            aiFeedback=ai_response.aiFeedback,
+            aiAssessment=ai_response.aiAssessment,
         )
         return response_model
 
@@ -249,18 +252,15 @@ class LearningEntriesApiHandler:
 
             if interaction_input.isFinal:
                 # Process final submission
-                final_entry_model = self._process_final_submission(
+                model = self._process_final_submission(
                     interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
                 )
-                # Response is the created final ReflectionVersionItemModel
-                return format_lambda_response(201, final_entry_model.model_dump(exclude_none=True))
             else:
                 # Process draft submission
-                draft_response_model = self._process_draft_submission(
+                model = self._process_draft_submission(
                     interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
                 )
-                # Response is ReflectionFeedbackAndDraftResponseModel
-                return format_lambda_response(201, draft_response_model.model_dump(exclude_none=True))
+            return format_lambda_response(201, model.model_dump(exclude_none=True))
 
         else:
             return format_lambda_response(404, {"message": "Resource not found."})
@@ -314,10 +314,12 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
 
         learning_entries_table_dal = LearningEntriesTable(table_name)
         chatbot_secrets_manager = ChatBotSecrets(chatbot_secrets_name)
+        chatbot_wrapper = ChatBotWrapper()
 
         api_handler = LearningEntriesApiHandler(
             learning_entries_table=learning_entries_table_dal,
             chatbot_secrets_manager=chatbot_secrets_manager,
+            chatbot_wrapper=chatbot_wrapper,
         )
         return api_handler.handle(event)
 

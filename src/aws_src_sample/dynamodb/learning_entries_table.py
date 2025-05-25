@@ -6,10 +6,7 @@ import pydantic
 from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 
-from aws_src_sample.models.learning_entry_models import (
-    AssessmentLevel,
-    ReflectionVersionItemModel,
-)
+from aws_src_sample.models.learning_entry_models import ReflectionVersionItemModel
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -175,7 +172,7 @@ class LearningEntriesTable:
         """
         Retrieves the most recent draft version (isFinal=false) for a specific user, lesson, and section.
         """
-        drafts, _ = self.get_draft_versions_for_section(user_id, lesson_id, section_id, limit=1)
+        drafts, _ = self.get_draft_versions_for_section(user_id, lesson_id, section_id, limit=2)  # FIXME: fails w/ 1?
         if drafts:
             logger.info(f"Found most recent draft for {user_id} - {lesson_id}#{section_id}: {drafts[0].versionId}")
             return drafts[0]

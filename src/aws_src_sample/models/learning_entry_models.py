@@ -35,36 +35,51 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
     finalEntryCreatedAt: typing.Optional[str] = None
 
     @pydantic.field_validator("createdAt", "finalEntryCreatedAt", mode="before")
-    def ensure_iso_format_with_z(cls, v, field):
-        if v is None and field.name == "finalEntryCreatedAt":  # finalEntryCreatedAt can be None
-            return None
+    def ensure_iso_format_with_z(cls, v: typing.Any, info: pydantic.ValidationInfo) -> typing.Optional[str]:
+        field_name = info.field_name  # Get the field name from the info object
+
+        if v is None:
+            if field_name == "finalEntryCreatedAt":  # finalEntryCreatedAt can be None
+                return None
+            elif field_name == "createdAt":  # createdAt should not be None
+                # This check should ideally be handled by Pydantic's own required field validation
+                # if 'createdAt' is not Optional and has no default.
+                # However, keeping it here for explicit pre-validation is also possible.
+                raise ValueError(f"{field_name} cannot be None.")
+            return None  # Should not be reached if only validating these two fields
+
         if isinstance(v, datetime.datetime):
             # Ensure it's timezone-aware (UTC) and has 'Z'
             if v.tzinfo is None:
-                v = v.replace(tzinfo=datetime.timezone.utc)
+                v_utc = v.replace(tzinfo=datetime.timezone.utc)
             else:
-                v = v.astimezone(datetime.timezone.utc)
-            return v.isoformat().replace("+00:00", "Z")
+                v_utc = v.astimezone(datetime.timezone.utc)
+            return v_utc.isoformat().replace("+00:00", "Z")
+
         if isinstance(v, str):
-            # Basic check, can be more robust
-            if not v.endswith("Z"):
-                # Attempt to parse and reformat if possible, or raise error for strictness
-                try:
-                    dt_obj = datetime.datetime.fromisoformat(v.replace("Z", "+00:00"))
-                    return dt_obj.astimezone(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-                except ValueError:
-                    raise ValueError(
-                        f"{field.name} must be a valid ISO8601 string ending with Z, or a datetime object."
-                    )
-            return v
-        if v is None and field.name == "createdAt":  # createdAt should not be None
-            raise ValueError(f"{field.name} cannot be None.")
+            # Attempt to parse and reformat to ensure it's UTC and ends with 'Z'
+            try:
+                # Handle if 'Z' is already there or if it needs +00:00 for parsing
+                if v.endswith("Z"):
+                    dt_obj = datetime.datetime.fromisoformat(v[:-1] + "+00:00")
+                else:
+                    dt_obj = datetime.datetime.fromisoformat(v)  # Try parsing directly
 
-        raise TypeError(f"Unsupported type for {field.name}: {type(v)}")
+                # Ensure it's UTC after parsing
+                if dt_obj.tzinfo is None:
+                    dt_obj_utc = dt_obj.replace(tzinfo=datetime.timezone.utc)
+                else:
+                    dt_obj_utc = dt_obj.astimezone(datetime.timezone.utc)
 
-    class Config:
-        use_enum_values = True  # For AssessmentLevel enum
-        # Pydantic V2: from_attributes = True
+                reformatted_v = dt_obj_utc.isoformat().replace("+00:00", "Z")
+                return reformatted_v
+            except ValueError:
+                raise ValueError(
+                    f"{field_name} ('{v}') is not a valid ISO8601 string that can be parsed to a datetime object."
+                )
+
+        # If 'v' is not None, not a datetime, and not a string, it's an unsupported type for this validator.
+        raise TypeError(f"Unsupported type for {field_name}: {type(v)}. Expected datetime object or ISO8601 string.")
 
 
 class ReflectionInteractionInputModel(pydantic.BaseModel):
@@ -87,15 +102,11 @@ class ReflectionInteractionInputModel(pydantic.BaseModel):
 class ReflectionFeedbackAndDraftResponseModel(pydantic.BaseModel):
     """
     Pydantic model for the response when a draft is created (isFinal=false).
-    Matches ReflectionFeedbackAndVersionResponse in your latest Swagger (renamed for clarity).
     """
 
     draftEntry: ReflectionVersionItemModel  # This is the DDB item model
-    currentAiFeedback: str
-    currentAiAssessment: AssessmentLevel  # Pydantic will handle enum serialization
-
-    class Config:
-        use_enum_values = True
+    aiFeedback: str
+    aiAssessment: AssessmentLevel  # Pydantic will handle enum serialization
 
 
 class ListOfReflectionDraftsResponseModel(pydantic.BaseModel):
