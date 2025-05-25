@@ -11,6 +11,23 @@ class ChatBotFeedback(typing.NamedTuple):
     aiAssessment: AssessmentLevel
 
 
+class ReflectionInteractionInputModel(pydantic.BaseModel):
+    """
+    Pydantic model for the request body of POST /lessons/.../reflections.
+    Matches ReflectionInteractionInput in Swagger.
+    """
+
+    userTopic: str
+    userCode: str
+    userExplanation: str  # Name from your latest Swagger
+    isFinal: bool = False
+    sourceVersionId: typing.Optional[str] = None
+
+    class Config:
+        # Pydantic V2: from_attributes = True (if creating from ORM models, not relevant here)
+        extra = "forbid"  # Disallow extra fields in request
+
+
 class ReflectionVersionItemModel(pydantic.BaseModel):
     """
     Pydantic model representing a reflection version item stored in DynamoDB.
@@ -24,11 +41,10 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
     userTopic: str
     userCode: str
     userExplanation: str
-    createdAt: str  # ISO8601 string. Consider using datetime and validating/serializing.
-    isFinal: bool
-
     aiFeedback: typing.Optional[str] = None
     aiAssessment: typing.Optional[AssessmentLevel] = None
+    createdAt: str  # ISO8601 string. Consider using datetime and validating/serializing.
+    isFinal: bool
 
     # Attribute for GSI for final entries. Only populated if isFinal is true.
     # Value is the same as createdAt for that final entry.
@@ -82,23 +98,6 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
         raise TypeError(f"Unsupported type for {field_name}: {type(v)}. Expected datetime object or ISO8601 string.")
 
 
-class ReflectionInteractionInputModel(pydantic.BaseModel):
-    """
-    Pydantic model for the request body of POST /lessons/.../reflections.
-    Matches ReflectionInteractionInput in Swagger.
-    """
-
-    userTopic: str
-    userCode: str
-    userExplanation: str  # Name from your latest Swagger
-    isFinal: bool = False
-    sourceVersionId: typing.Optional[str] = None
-
-    class Config:
-        # Pydantic V2: from_attributes = True (if creating from ORM models, not relevant here)
-        extra = "forbid"  # Disallow extra fields in request
-
-
 class ReflectionFeedbackAndDraftResponseModel(pydantic.BaseModel):
     """
     Pydantic model for the response when a draft is created (isFinal=false).
@@ -106,7 +105,7 @@ class ReflectionFeedbackAndDraftResponseModel(pydantic.BaseModel):
 
     draftEntry: ReflectionVersionItemModel  # This is the DDB item model
     aiFeedback: str
-    aiAssessment: AssessmentLevel  # Pydantic will handle enum serialization
+    aiAssessment: AssessmentLevel
 
 
 class ListOfReflectionDraftsResponseModel(pydantic.BaseModel):

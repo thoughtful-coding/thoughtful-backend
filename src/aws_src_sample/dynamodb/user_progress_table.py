@@ -6,8 +6,8 @@ import boto3
 from botocore.exceptions import ClientError
 
 from aws_src_sample.models.user_progress_models import (
-    SectionCompletionModel,
-    UserProgressResponseModel,
+    SectionCompletionInputModel,
+    UserProgressModel,
 )
 
 _LOGGER = logging.getLogger(__name__)
@@ -23,7 +23,7 @@ class UserProgressTable:
         self.client = boto3.resource("dynamodb")
         self.table = self.client.Table(table_name)
 
-    def get_progress(self, user_id: str) -> typing.Optional[UserProgressResponseModel]:
+    def get_progress(self, user_id: str) -> typing.Optional[UserProgressModel]:
         """
         Retrieves a user's progress from DynamoDB.
         :param user_id: The ID of the user.
@@ -34,7 +34,7 @@ class UserProgressTable:
             response = self.table.get_item(Key={"userId": user_id})
             item = response.get("Item")
             if item:
-                return UserProgressResponseModel.model_validate(item)
+                return UserProgressModel.model_validate(item)
             _LOGGER.info("No progress found for user_id: %s", user_id)
             return None
         except ClientError as e:
@@ -49,14 +49,14 @@ class UserProgressTable:
     def update_progress(
         self,
         user_id: str,
-        completions_to_add: list[SectionCompletionModel],
-    ) -> UserProgressResponseModel:
+        completions_to_add: list[SectionCompletionInputModel],
+    ) -> UserProgressModel:
         """
         Updates user's progress by adding new section completions.
         Only adds completions for sections that haven't been completed before (preserves first completion time).
         Server sets the timeFirstCompleted timestamp for new completions.
         :param user_id: The ID of the user.
-        :param completions_to_add: A list of SectionCompletionModel objects.
+        :param completions_to_add: A list of SectionCompletionInputModel objects.
         :return: The updated UserProgressModel.
         """
         _LOGGER.info("Updating progress for user_id: %s with %d new completions.", user_id, len(completions_to_add))
@@ -75,10 +75,10 @@ class UserProgressTable:
                 )
                 updated_item = response.get("Attributes", {})
                 if updated_item:
-                    return UserProgressResponseModel.model_validate(updated_item)
+                    return UserProgressModel.model_validate(updated_item)
 
                 # Fallback: create new user
-                new_progress = UserProgressResponseModel(userId=user_id)
+                new_progress = UserProgressModel(userId=user_id)
                 self.table.put_item(Item=new_progress.model_dump())
                 return new_progress
             except ClientError as e:
@@ -151,9 +151,9 @@ class UserProgressTable:
             updated_item = response.get("Attributes", {})
             if not updated_item:
                 _LOGGER.error("UpdateItem did not return attributes for user_id: %s", user_id)
-                return self.get_progress(user_id) or UserProgressResponseModel(userId=user_id)
+                return self.get_progress(user_id) or UserProgressModel(userId=user_id)
 
-            return UserProgressResponseModel.model_validate(updated_item)
+            return UserProgressModel.model_validate(updated_item)
 
         except ClientError as e:
             _LOGGER.exception(

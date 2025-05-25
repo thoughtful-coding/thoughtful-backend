@@ -6,7 +6,7 @@ import pytest
 from moto import mock_aws
 
 from aws_src_sample.dynamodb.user_progress_table import (
-    SectionCompletionModel,
+    SectionCompletionInputModel,
     UserProgressTable,
 )
 
@@ -122,7 +122,7 @@ def test_update_progress_single_update(user_progress_table_instance: UserProgres
     """
     user_id = "test-user-123"
 
-    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s1")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionInputModel(lessonId="l1", sectionId="s1")])
     result = user_progress_table_instance.get_progress(user_id)
 
     assert result is not None
@@ -138,9 +138,9 @@ def test_update_progress_triple_update(user_progress_table_instance: UserProgres
     """
     user_id = "test-user-123"
 
-    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s1")])
-    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s2")])
-    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s3")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionInputModel(lessonId="l1", sectionId="s1")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionInputModel(lessonId="l1", sectionId="s2")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionInputModel(lessonId="l1", sectionId="s3")])
     result = user_progress_table_instance.get_progress(user_id)
 
     assert result is not None
@@ -155,9 +155,9 @@ def test_update_progress_multi_lesson_updates(
 ) -> None:
     user_id = "test-user-123"
 
-    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s1")])
-    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l1", sectionId="s2")])
-    user_progress_table_instance.update_progress(user_id, [SectionCompletionModel(lessonId="l2", sectionId="s1")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionInputModel(lessonId="l1", sectionId="s1")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionInputModel(lessonId="l1", sectionId="s2")])
+    user_progress_table_instance.update_progress(user_id, [SectionCompletionInputModel(lessonId="l2", sectionId="s1")])
     result = user_progress_table_instance.get_progress(user_id)
 
     assert result is not None
@@ -176,9 +176,9 @@ def test_update_progress_big_update(user_progress_table_instance: UserProgressTa
     user_progress_table_instance.update_progress(
         user_id,
         [
-            SectionCompletionModel(lessonId="l1", sectionId="s1"),
-            SectionCompletionModel(lessonId="l1", sectionId="s2"),
-            SectionCompletionModel(lessonId="l2", sectionId="s1"),
+            SectionCompletionInputModel(lessonId="l1", sectionId="s1"),
+            SectionCompletionInputModel(lessonId="l1", sectionId="s2"),
+            SectionCompletionInputModel(lessonId="l2", sectionId="s1"),
         ],
     )
     result = user_progress_table_instance.get_progress(user_id)
