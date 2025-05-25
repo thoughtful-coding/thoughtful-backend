@@ -5,10 +5,10 @@ import typing
 
 from pydantic import ValidationError
 
-from aws_src_sample.dynamodb.user_progress_table import (
+from aws_src_sample.dynamodb.user_progress_table import UserProgressTable
+from aws_src_sample.models.user_progress_models import (
     BatchCompletionsInputModel,
     UserProgressResponseModel,
-    UserProgressTable,
 )
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,

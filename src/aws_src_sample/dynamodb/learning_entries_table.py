@@ -1,4 +1,3 @@
-import datetime
 import logging
 import typing
 
@@ -7,66 +6,13 @@ import pydantic
 from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 
-from aws_src_sample.utils.chatbot_utils import AssessmentLevel
+from aws_src_sample.models.learning_entry_models import (
+    AssessmentLevel,
+    ReflectionVersionItemModel,
+)
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
-
-
-class ReflectionVersionItemModel(pydantic.BaseModel):
-    """
-    Pydantic model representing a reflection version item stored in DynamoDB.
-    Aligns with ReflectionVersionItem in Swagger.
-    """
-
-    versionId: str = pydantic.Field(description="Unique identifier (SK): lessonId#sectionId#createdAtISO")
-    userId: str = pydantic.Field(description="Partition Key")
-    lessonId: str
-    sectionId: str
-    userTopic: str
-    userCode: str
-    userExplanation: str
-    createdAt: str  # ISO8601 string. Consider using datetime and validating/serializing.
-    isFinal: bool
-
-    aiFeedback: typing.Optional[str] = None
-    aiAssessment: typing.Optional[AssessmentLevel] = None
-
-    # Attribute for GSI for final entries. Only populated if isFinal is true.
-    # Value is the same as createdAt for that final entry.
-    finalEntryCreatedAt: typing.Optional[str] = None
-
-    @pydantic.field_validator("createdAt", "finalEntryCreatedAt", pre=True, always=True)
-    def ensure_iso_format_with_z(cls, v, field):
-        if v is None and field.name == "finalEntryCreatedAt":  # finalEntryCreatedAt can be None
-            return None
-        if isinstance(v, datetime.datetime):
-            # Ensure it's timezone-aware (UTC) and has 'Z'
-            if v.tzinfo is None:
-                v = v.replace(tzinfo=datetime.timezone.utc)
-            else:
-                v = v.astimezone(datetime.timezone.utc)
-            return v.isoformat().replace("+00:00", "Z")
-        if isinstance(v, str):
-            # Basic check, can be more robust
-            if not v.endswith("Z"):
-                # Attempt to parse and reformat if possible, or raise error for strictness
-                try:
-                    dt_obj = datetime.datetime.fromisoformat(v.replace("Z", "+00:00"))
-                    return dt_obj.astimezone(datetime.timezone.utc).isoformat().replace("+00:00", "Z")
-                except ValueError:
-                    raise ValueError(
-                        f"{field.name} must be a valid ISO8601 string ending with Z, or a datetime object."
-                    )
-            return v
-        if v is None and field.name == "createdAt":  # createdAt should not be None
-            raise ValueError(f"{field.name} cannot be None.")
-
-        raise TypeError(f"Unsupported type for {field.name}: {type(v)}")
-
-    class Config:
-        use_enum_values = True  # For AssessmentLevel enum
-        # Pydantic V2: from_attributes = True
 
 
 class LearningEntriesTable:

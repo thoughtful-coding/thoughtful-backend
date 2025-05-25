@@ -4,25 +4,14 @@ from datetime import datetime, timezone
 
 import boto3
 from botocore.exceptions import ClientError
-from pydantic import BaseModel, Field
+
+from aws_src_sample.models.user_progress_models import (
+    SectionCompletionModel,
+    UserProgressResponseModel,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
-
-
-class SectionCompletionModel(BaseModel):
-    lessonId: str
-    sectionId: str
-
-
-class BatchCompletionsInputModel(BaseModel):
-    completions: list[SectionCompletionModel]
-
-
-class UserProgressResponseModel(BaseModel):
-    userId: str
-    # completion structure: lessonId -> sectionId -> timeFirstCompleted
-    completion: dict[str, dict[str, str]] = Field(default_factory=dict)
 
 
 class UserProgressTable:

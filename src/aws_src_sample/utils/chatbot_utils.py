@@ -4,6 +4,8 @@ import typing
 
 import requests
 
+from aws_src_sample.models.learning_entry_models import AssessmentLevel, ChatBotFeedback
+
 _LOGGER = logging.getLogger()
 _LOGGER.setLevel(logging.INFO)
 
@@ -37,13 +39,6 @@ Feedback: Your code is clear and accurately demonstrates the concept. Consider a
 
 CHATBOT_MODEL = "gemini-2.0-flash"
 
-AssessmentLevel = typing.Literal["achieves", "mostly", "developing", "insufficient"]
-
-
-class ChatBotFeedback(typing.NamedTuple):
-    feedback: str
-    assessment_level: AssessmentLevel
-
 
 def generate_chatbot_feedback_prompt(*, topic: str, code: str, explanation: str) -> str:
     return _PROMPT.format(topic, code, explanation)
@@ -60,10 +55,6 @@ def call_google_genai_api(
     Calls the Google Generative AI API.
     submission_content expects: userTopic, userCode, userExplanation from ReflectionInteractionInput.
     """
-    if not chatbot_api_key:
-        _LOGGER.error("ChatBot API Key not configured for handler.")
-        raise ValueError("AI service configuration error on server.")
-
     api_endpoint = (
         f"https://generativelanguage.googleapis.com/v1beta/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
     )

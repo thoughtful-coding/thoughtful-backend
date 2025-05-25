@@ -3,15 +3,20 @@ import json
 import logging
 import typing
 
-# boto3 is available in Lambda environment by default
 from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
-from aws_src_sample.dynamodb.learning_entries_table import (
-    LearningEntriesTable,
+from aws_src_sample.dynamodb.learning_entries_table import LearningEntriesTable
+from aws_src_sample.models.learning_entry_models import (
+    ListOfFinalLearningEntriesResponseModel,
+    ListOfReflectionDraftsResponseModel,
+    ReflectionFeedbackAndDraftResponseModel,
+    ReflectionInteractionInputModel,
     ReflectionVersionItemModel,
 )
 from aws_src_sample.secrets_manager.chatbot_secrets import ChatBotSecrets
+
+# Utilities and Models
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
     get_user_id_from_event,
@@ -22,7 +27,7 @@ from aws_src_sample.utils.aws_env_vars import (
 )
 from aws_src_sample.utils.chatbot_utils import call_google_genai_api
 
-_LOGGER = logging.getLogger()
+_LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
 
 
@@ -34,206 +39,277 @@ class LearningEntriesApiHandler:
     ):
         self.learning_entries_table = learning_entries_table
         self.chatbot_secrets = chatbot_secrets
+        chatbot_api_key = self.chatbot_secrets.get_secret_value("CHATBOT_API_KEY")
+        if not chatbot_api_key:
+            raise ValueError("AI service configuration error (secrets not found during init).")
+        self.chatbot_api_key = chatbot_api_key
 
     def _process_draft_submission(
         self,
-        request_body: dict,
+        interaction_input: ReflectionInteractionInputModel,
         *,
         user_id: str,
         lesson_id: str,
         section_id: str,
-    ) -> dict:
+    ) -> ReflectionFeedbackAndDraftResponseModel:
         """
         Handles draft submissions (`isFinal: false`): gets AI feedback, saves a new draft.
-        Returns the data payload for ReflectionFeedbackAndDraftResponse.
         """
-        chatbot_api_key = self.chatbot_secrets.get_secret_value("CHATBOT_API_KEY")
-        if not chatbot_api_key:
-            raise KeyError("Couldn't find CHATBOT_API_KEY")
+        _LOGGER.info(f"Processing DRAFT submission for {user_id}, {lesson_id}#{section_id}")
 
-        user_topic = request_body.get("userTopic", "")
-        user_code = request_body.get("userCode", "")
-        user_explanation = request_body.get("userExplanation", "")
-        ai_response_data = call_google_genai_api(
-            chatbot_api_key=chatbot_api_key,
-            topic=user_topic,
-            code=user_code,
-            explanation=user_explanation,
+        ai_response = call_google_genai_api(
+            chatbot_api_key=self.chatbot_api_key,
+            topic=interaction_input.userTopic,
+            code=interaction_input.userCode,
+            explanation=interaction_input.userExplanation,
         )
 
-        timestamp_dt = datetime.datetime.now().replace(tzinfo=datetime.timezone.utc)
-        # Create versionId (DynamoDB SK format) using the full ISO string with 'Z'
+        timestamp_dt = datetime.datetime.now(datetime.timezone.utc)
         version_id_sk_format = f"{lesson_id}#{section_id}#{timestamp_dt.isoformat().replace('+00:00', 'Z')}"
 
-        draft_data_for_model = {
+        draft_ddb_item_data = {
             "versionId": version_id_sk_format,
             "userId": user_id,
             "lessonId": lesson_id,
             "sectionId": section_id,
-            "userTopic": user_topic,
-            "userCode": user_code,
-            "userExplanation": user_explanation,
-            "aiFeedback": ai_response_data.feedback,
-            "aiAssessment": ai_response_data.assessment_level,
-            "createdAt": timestamp_dt,  # Pass datetime object for Pydantic validator
+            "userTopic": interaction_input.userTopic,
+            "userCode": interaction_input.userCode,
+            "userExplanation": interaction_input.userExplanation,
+            "aiFeedback": ai_response.aiFeedback,
+            "aiAssessment": ai_response.aiAssessment,
+            "createdAt": timestamp_dt,
             "isFinal": False,
-            "sourceVersionId": None,
+            "sourceVersionId": None,  # Drafts usually don't have a source this way
             "finalEntryCreatedAt": None,
         }
 
-        try:
-            reflection_version_item = ReflectionVersionItemModel(**draft_data_for_model)
-        except ValidationError as e:
-            _LOGGER.error(f"Pydantic validation error for draft item: {e}", exc_info=True)
-            raise ValueError(f"Invalid data constructing reflection draft: {e}")
+        # Create and validate Pydantic model for DDB item
+        reflection_ddb_item = ReflectionVersionItemModel(**draft_ddb_item_data)
+        saved_draft_ddb_item = self.learning_entries_table.save_item(reflection_ddb_item)
 
-        saved_draft_item_model = self.learning_entries_table.save_item(reflection_version_item)
-
-        response_payload = {
-            "draftEntry": saved_draft_item_model.model_dump(exclude_none=True),  # Pydantic V2
-            "currentAiFeedback": ai_response_data.feedback,
-            "currentAiAssessment": ai_response_data.assessment_level,
-        }
-        return response_payload
+        # Construct Pydantic response model
+        response_model = ReflectionFeedbackAndDraftResponseModel(
+            draftEntry=saved_draft_ddb_item,
+            currentAiFeedback=ai_response.aiFeedback,
+            currentAiAssessment=ai_response.aiAssessment,
+        )
+        return response_model
 
     def _process_final_submission(
         self,
-        request_body: dict,
+        interaction_input: ReflectionInteractionInputModel,
         *,
         user_id: str,
         lesson_id: str,
         section_id: str,
-    ) -> dict:
+    ) -> ReflectionVersionItemModel:
         """
-        Handles final submissions (`isFinal: true`): creates a new final entry, referencing a source draft.
-        Returns the data payload for FinalizedLearningEntryResponseEnriched.
-        (This is a stub for Step 4 - will be fully implemented then)
+        Handles final submissions (`isFinal: true`).
         """
         _LOGGER.info(f"Processing FINAL submission for {user_id}, {lesson_id}#{section_id}")
 
-        # Step 4 TODO:
-        # 1. If sourceVersionId is not provided by client, look up the most recent draft:
-        #    source_draft_model = self.entry_repository.get_most_recent_draft_for_section(user_id, lesson_id, section_id)
-        #    if not source_draft_model:
-        #        raise ValueError("Cannot finalize: No prior draft with AI feedback found.")
-        #    actual_source_version_id = source_draft_model.versionId
-        #    qualifying_ai_feedback = source_draft_model.aiFeedback
-        #    qualifying_ai_assessment = source_draft_model.aiAssessment
-        # Elif sourceVersionId *is* provided by client:
-        #    source_draft_model = self.entry_repository.get_version_by_id(user_id, source_version_id)
-        #    if not source_draft_model or source_draft_model.isFinal: # Must be a draft
-        #        raise ValueError(f"Invalid sourceVersionId '{source_version_id}' or it's not a draft.")
-        #    actual_source_version_id = source_draft_model.versionId
-        #    qualifying_ai_feedback = source_draft_model.aiFeedback
-        #    qualifying_ai_assessment = source_draft_model.aiAssessment
+        actual_source_version_id = interaction_input.sourceVersionId
+        if not actual_source_version_id:
+            _LOGGER.info("sourceVersionId not provided by client for final submission, finding most recent draft.")
+            source_draft_model = self.learning_entries_table.get_most_recent_draft_for_section(
+                user_id, lesson_id, section_id
+            )
+            if not source_draft_model:
+                raise ValueError("Cannot finalize: No prior draft found. Please get feedback on a draft first.")
+            actual_source_version_id = source_draft_model.versionId
+            # The qualifying AI feedback/assessment are on this source_draft_model,
+            # but as per user's clarification, they are not copied onto the final DDB record's
+            # aiFeedback/aiAssessment fields. The enrichment happens for GET /learning-entries.
+            # For the purpose of storing the final item itself, its own aiFeedback/Assessment are null.
+        else:  # Client provided sourceVersionId, validate it
+            source_draft_model = self.learning_entries_table.get_version_by_id(user_id, actual_source_version_id)
+            if not source_draft_model or source_draft_model.isFinal:
+                raise ValueError(f"Invalid sourceVersionId '{actual_source_version_id}' or it's not a draft.")
 
-        # 2. Create new final_item_data_for_model using submission_content for userTopic, userCode, userExplanation
-        #    Set isFinal=True, aiFeedback=None, aiAssessment=None
-        #    Set sourceVersionId = actual_source_version_id
-        #    Set finalEntryCreatedAt = new timestamp (same as createdAt for this final record)
-        #    final_item_model = ReflectionVersionItemModel(**final_item_data_for_model)
-        #    saved_final_item_model = self.entry_repository.save_item(final_item_model)
+        # Ensure the source draft (wherever it came from) had AI feedback
+        if source_draft_model.aiFeedback is None or source_draft_model.aiAssessment is None:
+            _LOGGER.error(
+                f"Source draft {actual_source_version_id} for finalization is missing AI feedback/assessment."
+            )
+            raise ValueError("The source draft for finalization is incomplete.")
 
-        # 3. Prepare FinalizedLearningEntryResponseEnriched payload:
-        #    entryId = saved_final_item_model.versionId
-        #    user data from saved_final_item_model
-        #    qualifyingAiFeedback = qualifying_ai_feedback (from source draft)
-        #    qualifyingAiAssessment = qualifying_ai_assessment (from source draft)
-        #    createdAt = saved_final_item_model.createdAt
-        #    sourceVersionId = actual_source_version_id
+        timestamp_dt = datetime.datetime.now(datetime.timezone.utc)
+        final_version_id_sk = f"{lesson_id}#{section_id}#{timestamp_dt.isoformat().replace('+00:00', 'Z')}"
 
-        # For now, returning a placeholder indicating not implemented for Step 3
-        raise NotImplementedError("Final submission processing (Step 4) is not yet implemented.")
+        final_item_ddb_data = {
+            "versionId": final_version_id_sk,
+            "userId": user_id,
+            "lessonId": lesson_id,
+            "sectionId": section_id,
+            "userTopic": interaction_input.userTopic,
+            "userCode": interaction_input.userCode,
+            "userExplanation": interaction_input.userExplanation,
+            "aiFeedback": None,  # Final entry itself has no *new* AI feedback
+            "aiAssessment": None,  # Final entry itself has no *new* AI assessment
+            "createdAt": timestamp_dt,
+            "isFinal": True,
+            "sourceVersionId": actual_source_version_id,  # Link to the draft
+            "finalEntryCreatedAt": timestamp_dt.isoformat().replace("+00:00", "Z"),  # For GSI
+        }
 
-    def handle_post_request(self, event: dict, user_id: str) -> dict:
-        """
-        Main handler method for the class. Parses event, routes to specific processing methods.
-        """
-        try:
-            path_params = event.get("pathParameters", {})
-            lesson_id = path_params.get("lessonId")
-            section_id = path_params.get("sectionId")
+        final_reflection_ddb_item = ReflectionVersionItemModel(**final_item_ddb_data)
+        saved_final_ddb_item = self.learning_entries_table.save_item(final_reflection_ddb_item)
 
-            if not lesson_id or not section_id:
-                return format_lambda_response(400, {"message": "Missing lessonId or sectionId in path."})
+        # As per Swagger's oneOf, for isFinal=true, the response is the created final item.
+        # The GET /learning-entries is responsible for enrichment if client needs it that way.
+        # Your latest Swagger POST response for isFinal=true was FinalizedLearningEntryResponseEnriched.
+        # If we need to return that here, we'd do the enrichment now.
+        # Let's stick to the "non-enriched on GET" for now, meaning POST for final just returns the created final ReflectionVersionItemModel.
+        return saved_final_ddb_item
 
+    def _handle_get_draft_versions(
+        self, user_id: str, lesson_id: str, section_id: str, query_params: typing.Optional[dict]
+    ) -> ListOfReflectionDraftsResponseModel:
+        _LOGGER.info(f"Fetching DRAFT versions for {user_id}, {lesson_id}#{section_id}")
+        limit = 20
+        last_key_dict: typing.Optional[dict[str, typing.Any]] = None
+        if query_params:
             try:
-                request_body = json.loads(event.get("body") or "{}")
-            except json.JSONDecodeError:
-                return format_lambda_response(400, {"message": "Invalid JSON in request body."})
+                limit = int(query_params.get("limit", "20"))
+            except ValueError:
+                pass
+            if "lastEvaluatedKey" in query_params:
+                try:
+                    last_key_dict = json.loads(query_params["lastEvaluatedKey"])
+                except json.JSONDecodeError:
+                    _LOGGER.warning("Invalid lastEvaluatedKey query param.")
 
-            # Validate common required fields based on ReflectionInteractionInput
-            # (userTopic, userCode, userExplanation)
-            if not all(k in request_body for k in ["userTopic", "userCode", "userExplanation"]):
-                return format_lambda_response(
-                    400, {"message": "Missing required fields in body: userTopic, userCode, userExplanation."}
-                )
+        draft_ddb_items, next_last_key = self.learning_entries_table.get_draft_versions_for_section(
+            user_id, lesson_id, section_id, limit=limit, last_evaluated_key=last_key_dict
+        )
+        # The DAL already returns Pydantic models (ReflectionVersionItemModel)
+        return ListOfReflectionDraftsResponseModel(versions=draft_ddb_items, lastEvaluatedKey=next_last_key)
 
-            is_final_submission = request_body.get("isFinal", False)
-            if is_final_submission:
-                # This is where Step 4 logic will be fully integrated.
-                # For now, it's stubbed to reflect it's not part of Step 3's primary focus.
-                _LOGGER.info("Routing to final submission logic (currently stubbed for Step 3).")
-                # Call _process_final_submission which will raise NotImplementedError for now
-                response_data = self._process_final_submission(
-                    request_body, user_id=user_id, lesson_id=lesson_id, section_id=section_id
-                )
-                # The status code for successfully creating a final entry is 201
-                return format_lambda_response(201, response_data)
-            else:
-                # Process as a draft submission for AI feedback
-                response_data = self._process_draft_submission(
-                    request_body, user_id=user_id, lesson_id=lesson_id, section_id=section_id
-                )
-                # Swagger: oneOf ReflectionFeedbackAndDraftResponse or FinalizedLearningEntryResponseEnriched
-                # This path returns ReflectionFeedbackAndDraftResponse
-                return format_lambda_response(201, response_data)
+    def _handle_get_finalized_entries(
+        self, user_id: str, query_params: typing.Optional[dict]
+    ) -> ListOfFinalLearningEntriesResponseModel:
+        _LOGGER.info(f"Fetching FINALIZED entries for user {user_id}")
+        limit = 50
+        last_key_dict: typing.Optional[dict[str, typing.Any]] = None
+        if query_params:
+            try:
+                limit = int(query_params.get("limit", "50"))
+            except ValueError:
+                pass
+            if "lastEvaluatedKey" in query_params:
+                try:
+                    last_key_dict = json.loads(query_params["lastEvaluatedKey"])
+                except json.JSONDecodeError:
+                    _LOGGER.warning("Invalid lastEvaluatedKey query param.")
 
-        except ValidationError as ve:  # Pydantic validation error
-            _LOGGER.error(f"Pydantic ValidationError in handler: {str(ve)}", exc_info=True)
-            return format_lambda_response(400, {"message": f"Invalid input data: {ve.errors()}"})
-        except ValueError as ve:
-            _LOGGER.error(f"ValueError in handler: {str(ve)}", exc_info=True)
-            return format_lambda_response(400, {"message": str(ve)})
-        except (ConnectionError, TimeoutError) as ce:
-            _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
-            status_code = 504 if isinstance(ce, TimeoutError) else 503
-            return format_lambda_response(status_code, {"message": f"AI service communication error: {str(ce)}"})
-        except ClientError as e:
-            _LOGGER.error(f"DynamoDB ClientError in handler: {e.response['Error']['Message']}", exc_info=True)
-            return format_lambda_response(500, {"message": f"Database error: {e.response['Error']['Message']}"})
-        except NotImplementedError as nie:  # Specific for stubbed final submission
-            _LOGGER.warning(str(nie))
-            return format_lambda_response(501, {"message": str(nie)})
-        except Exception as e:
-            _LOGGER.error(f"Unexpected error in handler: {str(e)}", exc_info=True)
-            return format_lambda_response(500, {"message": f"An unexpected server error occurred."})
+        # DAL returns ReflectionVersionItemModel instances where isFinal=true
+        final_ddb_items, next_last_key = self.learning_entries_table.get_finalized_entries_for_user(
+            user_id, limit=limit, last_evaluated_key=last_key_dict
+        )
 
-    def handle(self, event: dict[str, typing.Any]) -> dict[str, typing.Any]:
-        _LOGGER.info(f"Lambda_handler invoked. Event (first 500 chars): {str(event)[:500]}")
+        # As per user: GET /learning-entries is NOT enriched. It returns ReflectionVersionItemModel list.
+        return ListOfFinalLearningEntriesResponseModel(entries=final_ddb_items, lastEvaluatedKey=next_last_key)
 
+    # --- Main Handler Method ---
+    def handle(self, event: dict) -> dict:
+        _LOGGER.info(f"Handler.handle invoked for path: {event.get('path')}, method: {event.get('httpMethod')}")
         user_id = get_user_id_from_event(event)
         if not user_id:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
 
         http_method = event.get("httpMethod")
-        if http_method == "POST":
-            return self.handle_post_request(event, user_id)
-        else:
-            _LOGGER.warning("Unsupported HTTP method for /progress: %s", http_method)
-            return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed on /progress."})
+        path = event.get("path", "")
+        path_params = event.get("pathParameters", {})
+        query_params = event.get("queryStringParameters")
+
+        try:
+            if (
+                http_method == "POST"
+                and path_params.get("lessonId")
+                and path_params.get("sectionId")
+                and path.endswith("/reflections")
+            ):
+                lesson_id = path_params["lessonId"]
+                section_id = path_params["sectionId"]
+
+                try:
+                    raw_body = event.get("body") or "{}"
+                    # Validate request body with Pydantic
+                    interaction_input = ReflectionInteractionInputModel.model_validate_json(raw_body)
+                except ValidationError as e:
+                    _LOGGER.error(f"Request body validation error: {e.errors()}", exc_info=True)
+                    return format_lambda_response(400, {"message": "Invalid request body.", "details": e.errors()})
+                except json.JSONDecodeError:
+                    _LOGGER.error("Request body is not valid JSON.", exc_info=True)
+                    return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
+
+                if interaction_input.isFinal:
+                    # Process final submission
+                    final_entry_model = self._process_final_submission(
+                        interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
+                    )
+                    # Response is the created final ReflectionVersionItemModel
+                    return format_lambda_response(201, final_entry_model.model_dump(exclude_none=True))
+                else:
+                    # Process draft submission
+                    draft_response_model = self._process_draft_submission(
+                        interaction_input, user_id=user_id, lesson_id=lesson_id, section_id=section_id
+                    )
+                    # Response is ReflectionFeedbackAndDraftResponseModel
+                    return format_lambda_response(201, draft_response_model.model_dump(exclude_none=True))
+
+            elif http_method == "GET":
+                if path == "/learning-entries":
+                    response_model = self._handle_get_finalized_entries(user_id, query_params)
+                    return format_lambda_response(200, response_model.model_dump(exclude_none=True))
+                elif path_params.get("lessonId") and path_params.get("sectionId") and path.endswith("/reflections"):
+                    lesson_id = path_params["lessonId"]
+                    section_id = path_params["sectionId"]
+                    response_model = self._handle_get_draft_versions(user_id, lesson_id, section_id, query_params)
+                    return format_lambda_response(200, response_model.model_dump(exclude_none=True))
+                else:
+                    return format_lambda_response(404, {"message": "Resource not found."})
+            else:
+                return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed."})
+
+        # Centralized error handling (can be more granular if needed)
+        except ValidationError as ve:
+            _LOGGER.error(f"Pydantic ValidationError in handler: {str(ve)}", exc_info=True)
+            return format_lambda_response(400, {"message": "Invalid data.", "details": ve.errors()})
+        except ValueError as ve:  # For business logic errors (e.g., "draft not found")
+            _LOGGER.warning(f"ValueError in handler: {str(ve)}", exc_info=False)  # Often not a server error
+            return format_lambda_response(400, {"message": str(ve)})
+        except (ConnectionError, TimeoutError) as ce:  # AI service issues
+            _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
+            status_code = 504 if isinstance(ce, TimeoutError) else 503
+            return format_lambda_response(status_code, {"message": f"AI service communication error: {str(ce)}"})
+        except ClientError as e:  # DynamoDB issues
+            _LOGGER.error(f"DynamoDB ClientError in handler: {e.response['Error']['Message']}", exc_info=True)
+            return format_lambda_response(500, {"message": f"Database error."})
+        # Removed NotImplementedError for _process_final_submission as it's now implemented
+        except Exception as e:
+            _LOGGER.error(f"Unexpected error in API handler: {str(e)}", exc_info=True)
+            return format_lambda_response(500, {"message": "An unexpected server error occurred."})
 
 
-def learning_entries_lambda_handler(event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
-    _LOGGER.debug("Global learning_entries_lambda_handler received event.")
-    _LOGGER.warning(event)
-
+def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
+    _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
     try:
-        leah = LearningEntriesApiHandler(
-            LearningEntriesTable(get_learning_entries_table_name()),
-            ChatBotSecrets(get_chatbot_secrets_name()),
+        table_name = get_learning_entries_table_name()
+        chatbot_secrets_name = get_chatbot_secrets_name()
+
+        if not table_name or not chatbot_secrets_name:
+            _LOGGER.critical("Missing critical env vars: table name or chatbot secrets name.")
+            return format_lambda_response(500, {"message": "Server configuration error."})
+
+        learning_entries_table_dal = LearningEntriesTable(table_name)
+        chatbot_secrets_util = ChatBotSecrets(chatbot_secrets_name)
+
+        api_handler = LearningEntriesApiHandler(
+            learning_entries_table=learning_entries_table_dal, chatbot_secrets=chatbot_secrets_util
         )
-        return leah.handle(event)
+        return api_handler.handle(event)
+
     except Exception as e:
-        _LOGGER.critical("Critical error in global progress handler or instantiation: %s", str(e), exc_info=True)
-        return format_lambda_response(500, {"message": f"Internal server error: {str(e)}"})
+        _LOGGER.critical(f"Critical error in global handler setup: {str(e)}", exc_info=True)
+        return format_lambda_response(500, {"message": f"Internal server error during handler setup."})
