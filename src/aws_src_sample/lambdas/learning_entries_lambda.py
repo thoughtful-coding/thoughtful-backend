@@ -24,7 +24,7 @@ from aws_src_sample.utils.apig_utils import (
     get_user_id_from_event,
 )
 from aws_src_sample.utils.aws_env_vars import (
-    get_chatbot_secrets_name,
+    get_chatbot_api_key_secrets_arn,
     get_learning_entries_table_name,
 )
 from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
@@ -306,7 +306,7 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
     try:
         table_name = get_learning_entries_table_name()
-        chatbot_secrets_name = get_chatbot_secrets_name()
+        chatbot_secrets_name = get_chatbot_api_key_secrets_arn()
 
         if not table_name or not chatbot_secrets_name:
             _LOGGER.critical("Missing critical env vars: table name or chatbot secrets name.")

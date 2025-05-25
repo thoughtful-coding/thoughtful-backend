@@ -31,11 +31,11 @@ def get_user_progress_table_name() -> str:
     return table_name
 
 
-def get_chatbot_secrets_name() -> str:
+def get_chatbot_api_key_secrets_arn() -> str:
     """
     Gets the AWS Secrets Manager secret name/ARN that stores the ChatBot API key.
     """
-    secret_name = os.environ.get("CHATBOT_API_KEY_SECRET_NAME")
+    secret_name = os.environ.get("CHATBOT_API_KEY_SECRETS_ARN")
     if not secret_name:
-        raise ValueError("Missing environment variable: CHATBOT_API_KEY_SECRET_NAME")
+        raise ValueError("Missing environment variable: CHATBOT_API_KEY_SECRETS_ARN")
     return secret_name
