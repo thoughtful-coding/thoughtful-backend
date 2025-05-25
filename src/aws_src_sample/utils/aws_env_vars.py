@@ -29,3 +29,13 @@ def get_user_progress_table_name() -> str:
     if not table_name:
         raise ValueError("Missing environment variable: USER_PROGRESS_TABLE_NAME")
     return table_name
+
+
+def get_chatbot_secrets_name() -> str:
+    """
+    Gets the AWS Secrets Manager secret name/ARN that stores the ChatBot API key.
+    """
+    secret_name = os.environ.get("CHATBOT_API_KEY_SECRET_NAME")
+    if not secret_name:
+        raise ValueError("Missing environment variable: CHATBOT_API_KEY_SECRET_NAME")
+    return secret_name

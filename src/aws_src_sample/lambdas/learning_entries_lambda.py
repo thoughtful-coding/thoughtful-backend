@@ -1,148 +1,239 @@
-#!/usr/bin/env python3
+import datetime
 import json
 import logging
 import typing
 
+# boto3 is available in Lambda environment by default
+from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
 from aws_src_sample.dynamodb.learning_entries_table import (
     LearningEntriesTable,
-    LearningEntryInputModel,
-    LearningEntryResponseModel,
+    ReflectionVersionItemModel,
 )
+from aws_src_sample.secrets_manager.chatbot_secrets import ChatBotSecrets
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
-    get_method,
     get_user_id_from_event,
 )
-from aws_src_sample.utils.aws_env_vars import get_learning_entries_table_name
+from aws_src_sample.utils.aws_env_vars import (
+    get_chatbot_secrets_name,
+    get_learning_entries_table_name,
+)
+from aws_src_sample.utils.chatbot_utils import call_google_genai_api
 
-_LOGGER = logging.getLogger(__name__)
+_LOGGER = logging.getLogger()
 _LOGGER.setLevel(logging.INFO)
 
 
 class LearningEntriesApiHandler:
-    """
-    Handles API requests for learning entries.
-    """
-
-    def __init__(self, learning_entries_table: LearningEntriesTable) -> None:
-        """
-        Initializes the handler with a DynamoDB wrapper.
-        :param learning_entries_table: An instance of LearningEntriesTable for DB operations.
-        """
+    def __init__(
+        self,
+        learning_entries_table: LearningEntriesTable,
+        chatbot_secrets: ChatBotSecrets,
+    ):
         self.learning_entries_table = learning_entries_table
-        _LOGGER.info("LearningEntriesApiHandler initialized.")
+        self.chatbot_secrets = chatbot_secrets
 
-    def _handle_get_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
-        _LOGGER.info("Handler: Processing GET request for user_id: %s", user_id)
+    def _process_draft_submission(
+        self,
+        request_body: dict,
+        *,
+        user_id: str,
+        lesson_id: str,
+        section_id: str,
+    ) -> dict:
+        """
+        Handles draft submissions (`isFinal: false`): gets AI feedback, saves a new draft.
+        Returns the data payload for ReflectionFeedbackAndDraftResponse.
+        """
+        chatbot_api_key = self.chatbot_secrets.get_secret_value("CHATBOT_API_KEY")
+        if not chatbot_api_key:
+            raise KeyError("Couldn't find CHATBOT_API_KEY")
+
+        user_topic = request_body.get("userTopic", "")
+        user_code = request_body.get("userCode", "")
+        user_explanation = request_body.get("userExplanation", "")
+        ai_response_data = call_google_genai_api(
+            chatbot_api_key=chatbot_api_key,
+            topic=user_topic,
+            code=user_code,
+            explanation=user_explanation,
+        )
+
+        timestamp_dt = datetime.datetime.now().replace(tzinfo=datetime.timezone.utc)
+        # Create versionId (DynamoDB SK format) using the full ISO string with 'Z'
+        version_id_sk_format = f"{lesson_id}#{section_id}#{timestamp_dt.isoformat().replace('+00:00', 'Z')}"
+
+        draft_data_for_model = {
+            "versionId": version_id_sk_format,
+            "userId": user_id,
+            "lessonId": lesson_id,
+            "sectionId": section_id,
+            "userTopic": user_topic,
+            "userCode": user_code,
+            "userExplanation": user_explanation,
+            "aiFeedback": ai_response_data.feedback,
+            "aiAssessment": ai_response_data.assessment_level,
+            "createdAt": timestamp_dt,  # Pass datetime object for Pydantic validator
+            "isFinal": False,
+            "sourceVersionId": None,
+            "finalEntryCreatedAt": None,
+        }
+
         try:
-            query_params = event.get("queryStringParameters") or {}
-            lesson_id_filter = query_params.get("lessonId")
-            section_id_filter = query_params.get("sectionId")
-            _LOGGER.debug("Query params: lessonId=%s, sectionId=%s", lesson_id_filter, section_id_filter)
+            reflection_version_item = ReflectionVersionItemModel(**draft_data_for_model)
+        except ValidationError as e:
+            _LOGGER.error(f"Pydantic validation error for draft item: {e}", exc_info=True)
+            raise ValueError(f"Invalid data constructing reflection draft: {e}")
 
-            target_user_id_for_query = user_id  # Default for student fetching their own
+        saved_draft_item_model = self.learning_entries_table.save_item(reflection_version_item)
 
-            # Example if path indicates an instructor route and needs different user_id logic
-            # path = event.get("path", "")
-            # if path.startswith("/instructor/") and "studentId" in query_params:
-            #    # Ensure current user (from token via user_id) is an authorized instructor!
-            #    target_user_id_for_query = query_params["studentId"]
+        response_payload = {
+            "draftEntry": saved_draft_item_model.model_dump(exclude_none=True),  # Pydantic V2
+            "currentAiFeedback": ai_response_data.feedback,
+            "currentAiAssessment": ai_response_data.assessment_level,
+        }
+        return response_payload
 
-            entry_models: list[LearningEntryResponseModel] = self.learning_entries_table.get_entries_by_user(
-                user_id=target_user_id_for_query, lesson_id_filter=lesson_id_filter, section_id_filter=section_id_filter
-            )
+    def _process_final_submission(
+        self,
+        request_body: dict,
+        *,
+        user_id: str,
+        lesson_id: str,
+        section_id: str,
+    ) -> dict:
+        """
+        Handles final submissions (`isFinal: true`): creates a new final entry, referencing a source draft.
+        Returns the data payload for FinalizedLearningEntryResponseEnriched.
+        (This is a stub for Step 4 - will be fully implemented then)
+        """
+        _LOGGER.info(f"Processing FINAL submission for {user_id}, {lesson_id}#{section_id}")
 
-            response_items = [entry.model_dump() for entry in entry_models]
-            return format_lambda_response(200, response_items)
+        # Step 4 TODO:
+        # 1. If sourceVersionId is not provided by client, look up the most recent draft:
+        #    source_draft_model = self.entry_repository.get_most_recent_draft_for_section(user_id, lesson_id, section_id)
+        #    if not source_draft_model:
+        #        raise ValueError("Cannot finalize: No prior draft with AI feedback found.")
+        #    actual_source_version_id = source_draft_model.versionId
+        #    qualifying_ai_feedback = source_draft_model.aiFeedback
+        #    qualifying_ai_assessment = source_draft_model.aiAssessment
+        # Elif sourceVersionId *is* provided by client:
+        #    source_draft_model = self.entry_repository.get_version_by_id(user_id, source_version_id)
+        #    if not source_draft_model or source_draft_model.isFinal: # Must be a draft
+        #        raise ValueError(f"Invalid sourceVersionId '{source_version_id}' or it's not a draft.")
+        #    actual_source_version_id = source_draft_model.versionId
+        #    qualifying_ai_feedback = source_draft_model.aiFeedback
+        #    qualifying_ai_assessment = source_draft_model.aiAssessment
 
-        except Exception as e:
-            _LOGGER.exception("Unexpected error handling GET request.")
-            error_message = str(e)
-            if (
-                hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]
-            ):  # Boto3 ClientError
-                error_message = f"Database error: {e.response['Error']['Message']}"
-            return format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
+        # 2. Create new final_item_data_for_model using submission_content for userTopic, userCode, userExplanation
+        #    Set isFinal=True, aiFeedback=None, aiAssessment=None
+        #    Set sourceVersionId = actual_source_version_id
+        #    Set finalEntryCreatedAt = new timestamp (same as createdAt for this final record)
+        #    final_item_model = ReflectionVersionItemModel(**final_item_data_for_model)
+        #    saved_final_item_model = self.entry_repository.save_item(final_item_model)
 
-    def _handle_post_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
-        _LOGGER.info("Handler: Processing POST request for user_id: %s", user_id)
+        # 3. Prepare FinalizedLearningEntryResponseEnriched payload:
+        #    entryId = saved_final_item_model.versionId
+        #    user data from saved_final_item_model
+        #    qualifyingAiFeedback = qualifying_ai_feedback (from source draft)
+        #    qualifyingAiAssessment = qualifying_ai_assessment (from source draft)
+        #    createdAt = saved_final_item_model.createdAt
+        #    sourceVersionId = actual_source_version_id
+
+        # For now, returning a placeholder indicating not implemented for Step 3
+        raise NotImplementedError("Final submission processing (Step 4) is not yet implemented.")
+
+    def handle_post_request(self, event: dict, user_id: str) -> dict:
+        """
+        Main handler method for the class. Parses event, routes to specific processing methods.
+        """
         try:
-            body_str = event.get("body")
-            if not body_str:
-                return format_lambda_response(400, {"message": "Missing request body."})
+            path_params = event.get("pathParameters", {})
+            lesson_id = path_params.get("lessonId")
+            section_id = path_params.get("sectionId")
 
-            raw_payload = json.loads(body_str)
-            entry_payload = LearningEntryInputModel.model_validate(raw_payload)
-            _LOGGER.debug("Validated entry_payload: %s", entry_payload.model_dump_json(indent=2))
+            if not lesson_id or not section_id:
+                return format_lambda_response(400, {"message": "Missing lessonId or sectionId in path."})
 
-            created_entry_model = self.learning_entries_table.add_entry(user_id=user_id, payload=entry_payload)
+            try:
+                request_body = json.loads(event.get("body") or "{}")
+            except json.JSONDecodeError:
+                return format_lambda_response(400, {"message": "Invalid JSON in request body."})
 
-            return format_lambda_response(
-                201,
-                {
-                    "success": True,
-                    "entryId": created_entry_model.entryId,
-                    "message": "Learning entry submitted successfully.",
-                },
-            )
+            # Validate common required fields based on ReflectionInteractionInput
+            # (userTopic, userCode, userExplanation)
+            if not all(k in request_body for k in ["userTopic", "userCode", "userExplanation"]):
+                return format_lambda_response(
+                    400, {"message": "Missing required fields in body: userTopic, userCode, userExplanation."}
+                )
 
-        except json.JSONDecodeError:
-            _LOGGER.exception("Invalid JSON in POST request body.")
-            return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
-        except ValidationError as ve:
-            _LOGGER.warning("Invalid request payload: %s", ve.errors())
-            return format_lambda_response(400, {"message": "Invalid request payload.", "details": ve.errors()})
+            is_final_submission = request_body.get("isFinal", False)
+            if is_final_submission:
+                # This is where Step 4 logic will be fully integrated.
+                # For now, it's stubbed to reflect it's not part of Step 3's primary focus.
+                _LOGGER.info("Routing to final submission logic (currently stubbed for Step 3).")
+                # Call _process_final_submission which will raise NotImplementedError for now
+                response_data = self._process_final_submission(
+                    request_body, user_id=user_id, lesson_id=lesson_id, section_id=section_id
+                )
+                # The status code for successfully creating a final entry is 201
+                return format_lambda_response(201, response_data)
+            else:
+                # Process as a draft submission for AI feedback
+                response_data = self._process_draft_submission(
+                    request_body, user_id=user_id, lesson_id=lesson_id, section_id=section_id
+                )
+                # Swagger: oneOf ReflectionFeedbackAndDraftResponse or FinalizedLearningEntryResponseEnriched
+                # This path returns ReflectionFeedbackAndDraftResponse
+                return format_lambda_response(201, response_data)
+
+        except ValidationError as ve:  # Pydantic validation error
+            _LOGGER.error(f"Pydantic ValidationError in handler: {str(ve)}", exc_info=True)
+            return format_lambda_response(400, {"message": f"Invalid input data: {ve.errors()}"})
         except ValueError as ve:
-            _LOGGER.warning("Value error creating entry: %s", str(ve))
+            _LOGGER.error(f"ValueError in handler: {str(ve)}", exc_info=True)
             return format_lambda_response(400, {"message": str(ve)})
+        except (ConnectionError, TimeoutError) as ce:
+            _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
+            status_code = 504 if isinstance(ce, TimeoutError) else 503
+            return format_lambda_response(status_code, {"message": f"AI service communication error: {str(ce)}"})
+        except ClientError as e:
+            _LOGGER.error(f"DynamoDB ClientError in handler: {e.response['Error']['Message']}", exc_info=True)
+            return format_lambda_response(500, {"message": f"Database error: {e.response['Error']['Message']}"})
+        except NotImplementedError as nie:  # Specific for stubbed final submission
+            _LOGGER.warning(str(nie))
+            return format_lambda_response(501, {"message": str(nie)})
         except Exception as e:
-            _LOGGER.exception("Unexpected error handling POST request.")
-            # Avoid leaking too many details in general exceptions if ClientError from DDB wrapper is not caught specifically
-            error_message = str(e)
-            if (
-                hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]
-            ):  # Boto3 ClientError
-                error_message = f"Database error: {e.response['Error']['Message']}"
-            return format_lambda_response(500, {"message": f"An unexpected error occurred: {error_message}"})
+            _LOGGER.error(f"Unexpected error in handler: {str(e)}", exc_info=True)
+            return format_lambda_response(500, {"message": f"An unexpected server error occurred."})
 
     def handle(self, event: dict[str, typing.Any]) -> dict[str, typing.Any]:
-        """
-        Main entry point for the handler class.
-        """
-        _LOGGER.info("LearningEntriesApiHandler.handle invoked. Event %s", str(event))
+        _LOGGER.info(f"Lambda_handler invoked. Event (first 500 chars): {str(event)[:500]}")
 
         user_id = get_user_id_from_event(event)
         if not user_id:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
 
-        http_method = get_method(event).upper()
-        _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
-
-        if http_method == "GET":
-            return self._handle_get_request(event, user_id)
-        elif http_method == "POST":
-            return self._handle_post_request(event, user_id)
+        http_method = event.get("httpMethod")
+        if http_method == "POST":
+            return self.handle_post_request(event, user_id)
         else:
-            _LOGGER.warning("Unsupported HTTP method received: %s", http_method)
-            return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed."})
+            _LOGGER.warning("Unsupported HTTP method for /progress: %s", http_method)
+            return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed on /progress."})
 
 
-def learning_entries_lambda_handler(
-    event: typing.Dict[str, typing.Any], context: typing.Any
-) -> typing.Dict[str, typing.Any]:
-    """
-    AWS Lambda entry point.
-    """
+def learning_entries_lambda_handler(event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
+    _LOGGER.debug("Global learning_entries_lambda_handler received event.")
     _LOGGER.warning(event)
 
     try:
-        leh = LearningEntriesApiHandler(
+        leah = LearningEntriesApiHandler(
             LearningEntriesTable(get_learning_entries_table_name()),
+            ChatBotSecrets(get_chatbot_secrets_name()),
         )
-        return leh.handle(event)
+        return leah.handle(event)
     except Exception as e:
-        # Catch-all for errors during handler instantiation (e.g., table name env var missing)
-        _LOGGER.critical("Critical error in global handler or instantiation: %s", str(e), exc_info=True)
+        _LOGGER.critical("Critical error in global progress handler or instantiation: %s", str(e), exc_info=True)
         return format_lambda_response(500, {"message": f"Internal server error: {str(e)}"})
