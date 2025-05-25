@@ -15,10 +15,12 @@ from aws_src_sample.models.learning_entry_models import (
     ReflectionVersionItemModel,
 )
 from aws_src_sample.secrets_manager.chatbot_secrets import ChatBotSecrets
-
-# Utilities and Models
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
+    get_method,
+    get_path,
+    get_path_parameters,
+    get_query_string_parameters,
     get_user_id_from_event,
 )
 from aws_src_sample.utils.aws_env_vars import (
@@ -35,11 +37,11 @@ class LearningEntriesApiHandler:
     def __init__(
         self,
         learning_entries_table: LearningEntriesTable,
-        chatbot_secrets: ChatBotSecrets,
+        chatbot_secrets_manager: ChatBotSecrets,
     ):
         self.learning_entries_table = learning_entries_table
-        self.chatbot_secrets = chatbot_secrets
-        chatbot_api_key = self.chatbot_secrets.get_secret_value("CHATBOT_API_KEY")
+        self.chatbot_secrets_manager = chatbot_secrets_manager
+        chatbot_api_key = self.chatbot_secrets_manager.get_secret_value("CHATBOT_API_KEY")
         if not chatbot_api_key:
             raise ValueError("AI service configuration error (secrets not found during init).")
         self.chatbot_api_key = chatbot_api_key
@@ -211,9 +213,9 @@ class LearningEntriesApiHandler:
         return ListOfFinalLearningEntriesResponseModel(entries=final_ddb_items, lastEvaluatedKey=next_last_key)
 
     def _route_get_request(self, event: dict, user_id: str) -> dict:
-        path = event.get("path", "")
-        path_params = event.get("pathParameters", {})
-        query_params = event.get("queryStringParameters")
+        path = get_path(event)
+        path_params = get_path_parameters(event)
+        query_params = get_query_string_parameters(event)
 
         if path == "/learning-entries":
             response_model = self._handle_get_finalized_entries(user_id, query_params)
@@ -227,8 +229,8 @@ class LearningEntriesApiHandler:
             return format_lambda_response(404, {"message": "Resource not found."})
 
     def _route_post_request(self, event: dict, user_id: str) -> dict:
-        path = event.get("path", "")
-        path_params = event.get("pathParameters", {})
+        path = get_path(event)
+        path_params = get_path_parameters(event)
 
         if path_params.get("lessonId") and path_params.get("sectionId") and path.endswith("/reflections"):
             lesson_id = path_params["lessonId"]
@@ -269,7 +271,8 @@ class LearningEntriesApiHandler:
         if not user_id:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
 
-        http_method = event.get("httpMethod")
+        http_method = get_method(event)
+        _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
 
         try:
             if http_method == "GET":
@@ -310,10 +313,11 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
             return format_lambda_response(500, {"message": "Server configuration error."})
 
         learning_entries_table_dal = LearningEntriesTable(table_name)
-        chatbot_secrets_util = ChatBotSecrets(chatbot_secrets_name)
+        chatbot_secrets_manager = ChatBotSecrets(chatbot_secrets_name)
 
         api_handler = LearningEntriesApiHandler(
-            learning_entries_table=learning_entries_table_dal, chatbot_secrets=chatbot_secrets_util
+            learning_entries_table=learning_entries_table_dal,
+            chatbot_secrets_manager=chatbot_secrets_manager,
         )
         return api_handler.handle(event)
 

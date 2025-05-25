@@ -34,7 +34,7 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
     # Value is the same as createdAt for that final entry.
     finalEntryCreatedAt: typing.Optional[str] = None
 
-    @pydantic.field_validator("createdAt", "finalEntryCreatedAt", pre=True, always=True)
+    @pydantic.field_validator("createdAt", "finalEntryCreatedAt", mode="before")
     def ensure_iso_format_with_z(cls, v, field):
         if v is None and field.name == "finalEntryCreatedAt":  # finalEntryCreatedAt can be None
             return None

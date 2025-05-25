@@ -3,7 +3,6 @@ import json
 import os
 from unittest.mock import Mock
 
-from aws_src_sample.dynamodb.learning_entries_table import LearningEntryResponseModel
 from aws_src_sample.lambdas.learning_entries_lambda import LearningEntriesApiHandler
 
 
@@ -13,8 +12,11 @@ def add_authorizier_info(event: dict, user_id: str) -> None:
 
 
 def test_learning_entries_api_handler_1():
-    ret = LearningEntriesApiHandler("1")
-    assert ret.learning_entries_table == "1"
+    learning_entries_table = Mock()
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
+    assert ret.learning_entries_table == learning_entries_table
+    assert ret.chatbot_secrets_manager == secrets_manager
 
 
 def test_learning_entries_api_handler_handle_error_1():
@@ -24,7 +26,8 @@ def test_learning_entries_api_handler_handle_error_1():
     event = {}
 
     learning_entries_table = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
     response = ret.handle(event)
 
     assert response["statusCode"] == 401
@@ -38,51 +41,103 @@ def test_learning_entries_api_handler_handle_error_2():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
     response = ret.handle(event)
 
     assert response["statusCode"] == 405
 
 
-def test_learning_entries_api_handler_handle_get_1():
-    event = {"requestContext": {"http": {"method": "GET"}}}
+def test_learning_entries_api_handler_handle_get_reflections_1():
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/lessons/l1/sections/s1/reflections",
+                "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
+            }
+        },
+    }
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.get_entries_by_user.return_value = []
-    ret = LearningEntriesApiHandler(learning_entries_table)
+    learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
     body_list = json.loads(response["body"])
-    assert body_list == []
+    assert body_list == {"versions": []}
 
 
-def test_learning_entries_api_handler_handle_get_2():
-    event = {"requestContext": {"http": {"method": "GET"}}}
+def test_learning_entries_api_handler_handle_get_reflection_2():
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/lessons/l1/sections/s1/reflections",
+                "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
+                "queryStringParameters": {"limit": "10", "lastEvaluatedKey": "{}"},
+            }
+        },
+    }
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.get_entries_by_user.return_value = [
-        LearningEntryResponseModel(
-            userId="e",
-            entryId="uuid_h",
-            submissionTopic="Things to think",
-            submissionCode="for i in range",
-            submissionExplanation="goes around",
-            aiFeedback="Good job",
-            aiAssessment="mostly",
-            createdAt="2025-05-26",
-        )
-    ]
-    ret = LearningEntriesApiHandler(learning_entries_table)
+    learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
+    breakpoint()
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
     body_list = json.loads(response["body"])
-    assert len(body_list) == 1
-    assert body_list[0]["userId"] == "e"
-    assert body_list[0]["entryId"] == "uuid_h"
+    assert body_list == {"versions": []}
+
+
+def test_learning_entries_api_handler_handle_get_finalized_1():
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/learning-entries",
+            }
+        },
+    }
+    add_authorizier_info(event, "e")
+
+    learning_entries_table = Mock()
+    learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_list = json.loads(response["body"])
+    assert body_list == {"entries": []}
+
+
+def test_learning_entries_api_handler_handle_get_finalized_2():
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/learning-entries",
+            }
+        },
+    }
+    add_authorizier_info(event, "e")
+
+    learning_entries_table = Mock()
+    learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_list = json.loads(response["body"])
+    assert body_list == {"entries": []}
 
 
 def test_learning_entries_api_handler_handle_post_1():
@@ -93,7 +148,8 @@ def test_learning_entries_api_handler_handle_post_1():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
     response = ret.handle(event)
 
     assert response["statusCode"] == 400
@@ -108,7 +164,8 @@ def test_learning_entries_api_handler_handle_post_2():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
     response = ret.handle(event)
 
     assert response["statusCode"] == 400
@@ -140,8 +197,8 @@ def test_learning_entries_api_handler_handle_post_3():
         aiAssessment="mostly",
         createdAt="2025-05-26",
     )
-
-    ret = LearningEntriesApiHandler(learning_entries_table)
+    secrets_manager = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager)
     response = ret.handle(event)
 
     assert response["statusCode"] == 201
