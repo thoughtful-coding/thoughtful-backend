@@ -7,8 +7,8 @@ from botocore.exceptions import ClientError
 
 from aws_src_sample.utils.aws_env_vars import get_chatbot_api_key_secrets_arn
 
-logger = logging.getLogger(__name__)
-logger.setLevel(logging.INFO)
+_LOGGER = logging.getLogger(__name__)
+_LOGGER.setLevel(logging.INFO)
 
 # Global cache for secrets within the Lambda execution environment
 # For more advanced caching (e.g., with TTL), consider libraries or more complex logic.
@@ -28,7 +28,7 @@ class ChatBotSecrets:
         :param secretsmanager_client: Optional pre-configured boto3 Secrets Manager client for testing.
         """
         self.client = boto3.client("secretsmanager")
-        logger.info(f"SecretsRepository initialized. Region: default")
+        _LOGGER.info(f"SecretsRepository initialized. Region: default")
 
     def _get_raw_secret_string(self, secret_name: str) -> typing.Optional[str]:
         """
@@ -36,22 +36,22 @@ class ChatBotSecrets:
         Caches the secret string upon first successful retrieval.
         """
         if secret_name in _secrets_cache:
-            logger.debug(f"Returning secret '{secret_name}' from cache.")
+            _LOGGER.debug(f"Returning secret '{secret_name}' from cache.")
             return _secrets_cache[secret_name]
 
         try:
-            logger.info(f"Fetching secret '{secret_name}' from AWS Secrets Manager.")
+            _LOGGER.info(f"Fetching secret '{secret_name}' from AWS Secrets Manager.")
             get_secret_value_response = self.client.get_secret_value(SecretId=secret_name)
         except ClientError as e:
             error_code = e.response.get("Error", {}).get("Code")
             if error_code == "ResourceNotFoundException":
-                logger.error(f"Secret '{secret_name}' not found in AWS Secrets Manager.")
+                _LOGGER.error(f"Secret '{secret_name}' not found in AWS Secrets Manager.")
             elif error_code == "InvalidRequestException":
-                logger.error(f"Invalid request for secret '{secret_name}': {e}")
+                _LOGGER.error(f"Invalid request for secret '{secret_name}': {e}")
             elif error_code == "DecryptionFailure":
-                logger.error(f"Failed to decrypt secret '{secret_name}': {e}")
+                _LOGGER.error(f"Failed to decrypt secret '{secret_name}': {e}")
             else:
-                logger.error(f"Error fetching secret '{secret_name}': {e}", exc_info=True)
+                _LOGGER.error(f"Error fetching secret '{secret_name}': {e}", exc_info=True)
             return None  # Or re-raise a custom exception
 
         # Decrypts secret using the associated KMS key.
@@ -64,7 +64,7 @@ class ChatBotSecrets:
         else:
             # Handle binary secrets if necessary, though API keys are typically strings.
             # For this use case, we expect SecretString.
-            logger.warning(f"Secret '{secret_name}' found but is in binary format, not SecretString.")
+            _LOGGER.warning(f"Secret '{secret_name}' found but is in binary format, not SecretString.")
             return None
 
     def _get_secret_value(self, secret_name: str, json_key: typing.Optional[str] = None) -> typing.Optional[str]:
@@ -88,17 +88,17 @@ class ChatBotSecrets:
             try:
                 secret_dict = json.loads(raw_secret_string)
                 if not isinstance(secret_dict, dict):
-                    logger.error(
+                    _LOGGER.error(
                         f"Secret '{secret_name}' is not a JSON object, but a json_key '{json_key}' was requested."
                     )
                     return None
 
                 value = secret_dict.get(json_key)
                 if value is None:
-                    logger.warning(f"Key '{json_key}' not found in JSON secret '{secret_name}'.")
+                    _LOGGER.warning(f"Key '{json_key}' not found in JSON secret '{secret_name}'.")
                     return None
                 if not isinstance(value, str):
-                    logger.warning(
+                    _LOGGER.warning(
                         f"Value for key '{json_key}' in secret '{secret_name}' is not a string. Type: {type(value)}"
                     )
                     # Depending on strictness, you might convert or return None.
@@ -106,7 +106,7 @@ class ChatBotSecrets:
                     return str(value)  # Attempt conversion
                 return value
             except json.JSONDecodeError:
-                logger.error(f"Failed to parse JSON for secret '{secret_name}' when expecting key '{json_key}'.")
+                _LOGGER.error(f"Failed to parse JSON for secret '{secret_name}' when expecting key '{json_key}'.")
                 return None
         else:
             # If no json_key, return the entire secret string
@@ -115,5 +115,6 @@ class ChatBotSecrets:
     def get_chatbot_api_key(self) -> str:
         secret = self._get_secret_value(secret_name=get_chatbot_api_key_secrets_arn())
         if not secret:
+            _LOGGER.debug("Unable to get API secret")
             raise KeyError("Couldn't get api secret")
         return secret

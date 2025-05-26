@@ -23,10 +23,7 @@ from aws_src_sample.utils.apig_utils import (
     get_query_string_parameters,
     get_user_id_from_event,
 )
-from aws_src_sample.utils.aws_env_vars import (
-    get_chatbot_api_key_secrets_arn,
-    get_learning_entries_table_name,
-)
+from aws_src_sample.utils.aws_env_vars import get_learning_entries_table_name
 from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
 
 _LOGGER = logging.getLogger(__name__)
@@ -227,6 +224,7 @@ class LearningEntriesApiHandler:
             response_model = self._handle_get_draft_versions(user_id, lesson_id, section_id, query_params)
             return format_lambda_response(200, response_model.model_dump(exclude_none=True))
         else:
+            _LOGGER.warning(f"No hit for path: {path}, pp: {path_params}, qp: {query_params}")
             return format_lambda_response(404, {"message": "Resource not found."})
 
     def _route_post_request(self, event: dict, user_id: str) -> dict:
@@ -262,6 +260,7 @@ class LearningEntriesApiHandler:
             return format_lambda_response(201, model.model_dump(exclude_none=True))
 
         else:
+            _LOGGER.warning(f"No hit for path: {path}, pp: {path_params}")
             return format_lambda_response(404, {"message": "Resource not found."})
 
     def handle(self, event: dict) -> dict:

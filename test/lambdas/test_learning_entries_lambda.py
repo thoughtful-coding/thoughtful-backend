@@ -102,6 +102,30 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
     assert body_list == {"versions": []}
 
 
+def test_learning_entries_api_handler_handle_get_reflection_3():
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/reflections/FIXME/sections/python-reflection",
+                "pathParameters": {"lessonId": "FIXME", "sectionId": "python-reflection"},
+            }
+        },
+    }
+    add_authorizier_info(event, "e")
+
+    learning_entries_table = Mock()
+    learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    secrets_manager = Mock()
+    chatbot_wrapper = Mock()
+    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_list = json.loads(response["body"])
+    assert body_list == {"versions": []}
+
+
 def test_learning_entries_api_handler_handle_get_finalized_1():
     event = {
         "requestContext": {
@@ -148,7 +172,7 @@ def test_learning_entries_api_handler_handle_get_finalized_2():
     assert body_list == {"entries": []}
 
 
-def test_learning_entries_api_handler_handle_put_reflection_1():
+def test_learning_entries_api_handler_handle_post_reflection_1():
     """
     Handle missing body
     """
@@ -172,7 +196,7 @@ def test_learning_entries_api_handler_handle_put_reflection_1():
     assert response["statusCode"] == 400
 
 
-def test_learning_entries_api_handler_handle_put_reflection_2():
+def test_learning_entries_api_handler_handle_post_reflection_2():
     """
     Handle bad body
     """
@@ -197,7 +221,7 @@ def test_learning_entries_api_handler_handle_put_reflection_2():
     assert response["statusCode"] == 400
 
 
-def test_learning_entries_api_handler_handle_put_reflection_3():
+def test_learning_entries_api_handler_handle_post_reflection_3():
     """
     Handle proper input
     """
