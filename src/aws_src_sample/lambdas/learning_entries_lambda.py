@@ -44,7 +44,7 @@ class LearningEntriesApiHandler:
         self.chatbot_secrets_manager = chatbot_secrets_manager
         self.chatbot_wrapper = chatbot_wrapper
 
-        chatbot_api_key = self.chatbot_secrets_manager.get_secret_value("CHATBOT_API_KEY")
+        chatbot_api_key = self.chatbot_secrets_manager.get_secret_value(get_chatbot_api_key_secrets_arn())
         if not chatbot_api_key:
             raise ValueError("AI service configuration error (secrets not found during init).")
         self.chatbot_api_key = chatbot_api_key
@@ -315,7 +315,7 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
             return format_lambda_response(500, {"message": "Server configuration error."})
 
         learning_entries_table_dal = LearningEntriesTable(table_name)
-        chatbot_secrets_manager = ChatBotSecrets(chatbot_secrets_name)
+        chatbot_secrets_manager = ChatBotSecrets()
         chatbot_wrapper = ChatBotWrapper()
 
         api_handler = LearningEntriesApiHandler(

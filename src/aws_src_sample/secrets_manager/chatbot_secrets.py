@@ -19,19 +19,14 @@ class ChatBotSecrets:
     including caching of secrets.
     """
 
-    def __init__(self, region_name: Optional[str] = None, secretsmanager_client=None):
+    def __init__(self):
         """
         Initializes the Secrets Manager client.
         :param region_name: Optional AWS region name. Defaults to region from environment.
         :param secretsmanager_client: Optional pre-configured boto3 Secrets Manager client for testing.
         """
-        if secretsmanager_client:
-            self.client = secretsmanager_client
-        else:
-            # If region_name is not provided, boto3 will use the default region
-            # configured for the Lambda execution environment.
-            self.client = boto3.client("secretsmanager", region_name=region_name)
-        logger.info(f"SecretsRepository initialized. Region: {region_name or 'default'}")
+        self.client = boto3.client("secretsmanager")
+        logger.info(f"SecretsRepository initialized. Region: default")
 
     def _get_raw_secret_string(self, secret_name: str) -> Optional[str]:
         """
