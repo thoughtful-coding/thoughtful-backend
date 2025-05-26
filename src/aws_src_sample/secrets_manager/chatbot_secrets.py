@@ -1,16 +1,18 @@
 import json
 import logging
-from typing import Any, Dict, Optional
+import typing
 
 import boto3
 from botocore.exceptions import ClientError
+
+from aws_src_sample.utils.aws_env_vars import get_chatbot_api_key_secrets_arn
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
 # Global cache for secrets within the Lambda execution environment
 # For more advanced caching (e.g., with TTL), consider libraries or more complex logic.
-_secrets_cache: Dict[str, Any] = {}
+_secrets_cache: dict[str, typing.Any] = {}
 
 
 class ChatBotSecrets:
@@ -28,7 +30,7 @@ class ChatBotSecrets:
         self.client = boto3.client("secretsmanager")
         logger.info(f"SecretsRepository initialized. Region: default")
 
-    def _get_raw_secret_string(self, secret_name: str) -> Optional[str]:
+    def _get_raw_secret_string(self, secret_name: str) -> typing.Optional[str]:
         """
         Retrieves the raw secret string from Secrets Manager or cache.
         Caches the secret string upon first successful retrieval.
@@ -65,7 +67,7 @@ class ChatBotSecrets:
             logger.warning(f"Secret '{secret_name}' found but is in binary format, not SecretString.")
             return None
 
-    def get_secret_value(self, secret_name: str, json_key: Optional[str] = None) -> Optional[str]:
+    def _get_secret_value(self, secret_name: str, json_key: typing.Optional[str] = None) -> typing.Optional[str]:
         """
         Retrieves a secret value from AWS Secrets Manager.
         If json_key is provided, the secret is assumed to be a JSON string,
@@ -109,3 +111,9 @@ class ChatBotSecrets:
         else:
             # If no json_key, return the entire secret string
             return raw_secret_string
+
+    def get_chatbot_api_key(self) -> str:
+        secret = self._get_secret_value(secret_name=get_chatbot_api_key_secrets_arn())
+        if not secret:
+            raise KeyError("Couldn't get api secret")
+        return secret

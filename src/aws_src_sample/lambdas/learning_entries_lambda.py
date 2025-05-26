@@ -44,11 +44,6 @@ class LearningEntriesApiHandler:
         self.chatbot_secrets_manager = chatbot_secrets_manager
         self.chatbot_wrapper = chatbot_wrapper
 
-        chatbot_api_key = self.chatbot_secrets_manager.get_secret_value(get_chatbot_api_key_secrets_arn())
-        if not chatbot_api_key:
-            raise ValueError("AI service configuration error (secrets not found during init).")
-        self.chatbot_api_key = chatbot_api_key
-
     def _process_draft_submission(
         self,
         interaction_input: ReflectionInteractionInputModel,
@@ -63,7 +58,7 @@ class LearningEntriesApiHandler:
         _LOGGER.info(f"Processing DRAFT submission for {user_id}, {lesson_id}#{section_id}")
 
         ai_response = self.chatbot_wrapper.call_api(
-            chatbot_api_key=self.chatbot_api_key,
+            chatbot_api_key=self.chatbot_secrets_manager.get_chatbot_api_key(),
             topic=interaction_input.userTopic,
             code=interaction_input.userCode,
             explanation=interaction_input.userExplanation,
@@ -307,14 +302,7 @@ class LearningEntriesApiHandler:
 def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
     try:
-        table_name = get_learning_entries_table_name()
-        chatbot_secrets_name = get_chatbot_api_key_secrets_arn()
-
-        if not table_name or not chatbot_secrets_name:
-            _LOGGER.critical("Missing critical env vars: table name or chatbot secrets name.")
-            return format_lambda_response(500, {"message": "Server configuration error."})
-
-        learning_entries_table_dal = LearningEntriesTable(table_name)
+        learning_entries_table_dal = LearningEntriesTable(get_learning_entries_table_name())
         chatbot_secrets_manager = ChatBotSecrets()
         chatbot_wrapper = ChatBotWrapper()
 
