@@ -234,7 +234,7 @@ class LearningEntriesApiHandler:
         path = get_path(event)
         path_params = get_path_parameters(event)
 
-        if path_params.get("lessonId") and path_params.get("sectionId") and path.endswith("/reflections"):
+        if path.startswith("/reflections/") and path_params.get("lessonId") and path_params.get("sectionId"):
             lesson_id = path_params["lessonId"]
             section_id = path_params["sectionId"]
 

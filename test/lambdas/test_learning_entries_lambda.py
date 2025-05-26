@@ -58,7 +58,7 @@ def test_learning_entries_api_handler_handle_get_reflections_1():
         "requestContext": {
             "http": {
                 "method": "GET",
-                "path": "/lessons/l1/sections/s1/reflections",
+                "path": "/reflections/l1/sections/s1",
                 "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
@@ -82,7 +82,7 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
         "requestContext": {
             "http": {
                 "method": "GET",
-                "path": "/lessons/l1/sections/s1/reflections",
+                "path": "/reflections/l1/sections/s1",
                 "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
                 "queryStringParameters": {"limit": "10", "lastEvaluatedKey": "{}"},
             }
@@ -155,8 +155,8 @@ def test_learning_entries_api_handler_handle_put_reflection_1():
     event = {
         "requestContext": {
             "http": {
-                "method": "PUT",
-                "path": "/lessons/l1/sections/s1/reflections",
+                "method": "POST",
+                "path": "/reflections/l1/sections/s1",
                 "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
@@ -179,8 +179,8 @@ def test_learning_entries_api_handler_handle_put_reflection_2():
     event = {
         "requestContext": {
             "http": {
-                "method": "PUT",
-                "path": "/lessons/l1/sections/s1/reflections",
+                "method": "POST",
+                "path": "/reflections/l1/sections/s1",
                 "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
@@ -209,8 +209,8 @@ def test_learning_entries_api_handler_handle_put_reflection_3():
     event = {
         "requestContext": {
             "http": {
-                "method": "PUT",
-                "path": "/lessons/l1/sections/s1/reflections",
+                "method": "POST",
+                "path": "/reflections/l1/sections/s1",
                 "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
