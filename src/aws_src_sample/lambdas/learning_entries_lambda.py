@@ -10,7 +10,6 @@ from aws_src_sample.dynamodb.learning_entries_table import LearningEntriesTable
 from aws_src_sample.models.learning_entry_models import (
     ListOfFinalLearningEntriesResponseModel,
     ListOfReflectionDraftsResponseModel,
-    ReflectionFeedbackAndDraftResponseModel,
     ReflectionInteractionInputModel,
     ReflectionVersionItemModel,
 )
@@ -48,7 +47,7 @@ class LearningEntriesApiHandler:
         user_id: str,
         lesson_id: str,
         section_id: str,
-    ) -> ReflectionFeedbackAndDraftResponseModel:
+    ) -> ReflectionVersionItemModel:
         """
         Handles draft submissions (`isFinal: false`): gets AI feedback, saves a new draft.
         """
@@ -82,17 +81,7 @@ class LearningEntriesApiHandler:
 
         # Create and validate Pydantic model for DDB item
         reflection_ddb_item = ReflectionVersionItemModel(**draft_ddb_item_data)
-        saved_draft_ddb_item = self.learning_entries_table.save_item(reflection_ddb_item)
-
-        # Construct Pydantic response model
-        response_model = ReflectionFeedbackAndDraftResponseModel(
-            versionId=saved_draft_ddb_item.versionId,
-            createdAt=saved_draft_ddb_item.createdAt,
-            submittedContent=saved_draft_ddb_item,
-            aiFeedback=ai_response.aiFeedback,
-            aiAssessment=ai_response.aiAssessment,
-        )
-        return response_model
+        return self.learning_entries_table.save_item(reflection_ddb_item)
 
     def _process_final_submission(
         self,

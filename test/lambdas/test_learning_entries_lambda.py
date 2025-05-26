@@ -301,6 +301,8 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
         userCode="for i in range",
         userExplanation="round and round",
         createdAt="2025-05-25",
+        aiFeedback="looks good",
+        aiAssessment="mostly",
         isFinal=False,
     )
     secrets_manager = Mock()

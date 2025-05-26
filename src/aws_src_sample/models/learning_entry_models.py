@@ -43,29 +43,21 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
     userExplanation: str
     aiFeedback: typing.Optional[str] = None
     aiAssessment: typing.Optional[AssessmentLevel] = None
-    createdAt: str  # ISO8601 string. Consider using datetime and validating/serializing.
+    createdAt: str  # ISO8601 string.
     isFinal: bool
-
-    # Attribute for GSI for final entries. Only populated if isFinal is true.
-    # Value is the same as createdAt for that final entry.
+    sourceVersionId: typing.Optional[str] = None
     finalEntryCreatedAt: typing.Optional[str] = None
 
     @pydantic.field_validator("createdAt", "finalEntryCreatedAt", mode="before")
+    @classmethod
     def ensure_iso_format_with_z(cls, v: typing.Any, info: pydantic.ValidationInfo) -> typing.Optional[str]:
-        field_name = info.field_name  # Get the field name from the info object
+        field_name = info.field_name if info else "UnknownField"
 
         if v is None:
-            if field_name == "finalEntryCreatedAt":  # finalEntryCreatedAt can be None
-                return None
-            elif field_name == "createdAt":  # createdAt should not be None
-                # This check should ideally be handled by Pydantic's own required field validation
-                # if 'createdAt' is not Optional and has no default.
-                # However, keeping it here for explicit pre-validation is also possible.
-                raise ValueError(f"{field_name} cannot be None.")
-            return None  # Should not be reached if only validating these two fields
+            assert field_name != "createdAt", "Should not be reached for createdAt if it's mandatory"
+            return None
 
         if isinstance(v, datetime.datetime):
-            # Ensure it's timezone-aware (UTC) and has 'Z'
             if v.tzinfo is None:
                 v_utc = v.replace(tzinfo=datetime.timezone.utc)
             else:
@@ -73,41 +65,25 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
             return v_utc.isoformat().replace("+00:00", "Z")
 
         if isinstance(v, str):
-            # Attempt to parse and reformat to ensure it's UTC and ends with 'Z'
             try:
-                # Handle if 'Z' is already there or if it needs +00:00 for parsing
                 if v.endswith("Z"):
+                    # Ensure it's parsed as UTC
                     dt_obj = datetime.datetime.fromisoformat(v[:-1] + "+00:00")
                 else:
-                    dt_obj = datetime.datetime.fromisoformat(v)  # Try parsing directly
+                    # Try parsing directly, assuming it might have offset or be naive
+                    dt_obj = datetime.datetime.fromisoformat(v)
 
-                # Ensure it's UTC after parsing
-                if dt_obj.tzinfo is None:
+                if dt_obj.tzinfo is None:  # If naive, assume UTC
                     dt_obj_utc = dt_obj.replace(tzinfo=datetime.timezone.utc)
-                else:
+                else:  # If aware, convert to UTC
                     dt_obj_utc = dt_obj.astimezone(datetime.timezone.utc)
 
-                reformatted_v = dt_obj_utc.isoformat().replace("+00:00", "Z")
-                return reformatted_v
+                return dt_obj_utc.isoformat().replace("+00:00", "Z")
             except ValueError:
                 raise ValueError(
                     f"{field_name} ('{v}') is not a valid ISO8601 string that can be parsed to a datetime object."
                 )
-
-        # If 'v' is not None, not a datetime, and not a string, it's an unsupported type for this validator.
         raise TypeError(f"Unsupported type for {field_name}: {type(v)}. Expected datetime object or ISO8601 string.")
-
-
-class ReflectionFeedbackAndDraftResponseModel(pydantic.BaseModel):
-    """
-    Pydantic model for the response when a draft is created (isFinal=false).
-    """
-
-    versionId: str
-    aiFeedback: str
-    aiAssessment: AssessmentLevel
-    createdAt: str
-    submittedContent: ReflectionVersionItemModel
 
 
 class ListOfReflectionDraftsResponseModel(pydantic.BaseModel):
