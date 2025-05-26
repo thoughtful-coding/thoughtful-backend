@@ -22,7 +22,7 @@ def get_path(event: dict) -> str:
 
 
 def get_path_parameters(event: dict) -> dict[str, str]:
-    return event.get("requestContext", {}).get("http", {}).get("pathParameters", {})
+    return event.get("pathParameters", {})
 
 
 def get_query_string_parameters(event) -> dict[str, str]:

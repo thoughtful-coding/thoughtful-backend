@@ -59,9 +59,9 @@ def test_learning_entries_api_handler_handle_get_reflections_1():
             "http": {
                 "method": "GET",
                 "path": "/reflections/l1/sections/s1",
-                "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
     }
     add_authorizier_info(event, "e")
 
@@ -83,10 +83,10 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
             "http": {
                 "method": "GET",
                 "path": "/reflections/l1/sections/s1",
-                "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
-                "queryStringParameters": {"limit": "10", "lastEvaluatedKey": "{}"},
             }
         },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
+        "queryStringParameters": {"limit": "10", "lastEvaluatedKey": "{}"},
     }
     add_authorizier_info(event, "e")
 
@@ -104,15 +104,64 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
 
 def test_learning_entries_api_handler_handle_get_reflection_3():
     event = {
+        "version": "2.0",
+        "routeKey": "GET /reflections/{lessonId}/sections/{sectionId}",
+        "rawPath": "/reflections/FIXME/sections/python-reflection",
+        "rawQueryString": "hey=there",
+        "headers": {
+            "accept": "*/*",
+            "accept-encoding": "gzip, deflate, br, zstd",
+            "accept-language": "en-US,en;q=0.9",
+            "authorization": "Bearer ..-----",
+            "content-length": "0",
+            "content-type": "application/json",
+            "host": "123456.execute-api.us-east-2.amazonaws.com",
+            "origin": "http://localhost:5173",
+            "priority": "u=1, i",
+            "referer": "http://localhost:5173/",
+            "sec-ch-ua": '"Chromium"',
+            "sec-ch-ua-mobile": "?0",
+            "sec-ch-ua-platform": '"macOS"',
+            "sec-fetch-dest": "empty",
+            "sec-fetch-mode": "cors",
+            "sec-fetch-site": "cross-site",
+            "user-agent": "Mozilla/5.0",
+            "x-amzn-trace-id": "Root=1-blah",
+            "x-forwarded-for": "127.0.0.1",
+            "x-forwarded-port": "443",
+            "x-forwarded-proto": "https",
+        },
+        "queryStringParameters": {"hey": "there"},
         "requestContext": {
+            "accountId": "abc1234",
+            "apiId": "123456",
+            "authorizer": {
+                "jwt": {
+                    "claims": {
+                        "email": "erizzi@ucls.uchicago.edu",
+                        "email_verified": "true",
+                    },
+                    "scopes": None,
+                }
+            },
+            "domainName": "123456.execute-api.us-east-2.amazonaws.com",
+            "domainPrefix": "123456",
             "http": {
                 "method": "GET",
                 "path": "/reflections/FIXME/sections/python-reflection",
-                "pathParameters": {"lessonId": "FIXME", "sectionId": "python-reflection"},
-            }
+                "protocol": "HTTP/1.1",
+                "sourceIp": "127.0.0.1",
+                "userAgent": "Mozilla/5.0",
+            },
+            "requestId": "LMF",
+            "routeKey": "GET /reflections/{lessonId}/sections/{sectionId}",
+            "stage": "$default",
+            "time": "26/May/2025:18:45:31 +0000",
+            "timeEpoch": 1748285131734,
         },
+        "pathParameters": {"lessonId": "FIXME", "sectionId": "python-reflection"},
+        "isBase64Encoded": False,
     }
-    add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
     learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
@@ -181,9 +230,9 @@ def test_learning_entries_api_handler_handle_post_reflection_1():
             "http": {
                 "method": "POST",
                 "path": "/reflections/l1/sections/s1",
-                "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
     }
     add_authorizier_info(event, "e")
 
@@ -205,9 +254,9 @@ def test_learning_entries_api_handler_handle_post_reflection_2():
             "http": {
                 "method": "POST",
                 "path": "/reflections/l1/sections/s1",
-                "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
         "body": "a",
     }
     add_authorizier_info(event, "e")
@@ -235,9 +284,9 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
             "http": {
                 "method": "POST",
                 "path": "/reflections/l1/sections/s1",
-                "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
             }
         },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
         "body": json.dumps(reflection),
     }
     add_authorizier_info(event, "e")
