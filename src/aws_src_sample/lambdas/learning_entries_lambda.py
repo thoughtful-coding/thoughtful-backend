@@ -213,6 +213,7 @@ class LearningEntriesApiHandler:
         return ListOfFinalLearningEntriesResponseModel(entries=final_ddb_items, lastEvaluatedKey=next_last_key)
 
     def _route_get_request(self, event: dict, user_id: str) -> dict:
+        _LOGGER.info("Handling GET request")
         path = get_path(event)
         path_params = get_path_parameters(event)
         query_params = get_query_string_parameters(event)
@@ -220,7 +221,7 @@ class LearningEntriesApiHandler:
         if path == "/learning-entries":
             response_model = self._handle_get_finalized_entries(user_id, query_params)
             return format_lambda_response(200, response_model.model_dump(exclude_none=True))
-        elif path_params.get("lessonId") and path_params.get("sectionId") and path.endswith("/reflections"):
+        elif path.startswith("/reflections/") and path_params.get("lessonId") and path_params.get("sectionId"):
             lesson_id = path_params["lessonId"]
             section_id = path_params["sectionId"]
             response_model = self._handle_get_draft_versions(user_id, lesson_id, section_id, query_params)
@@ -229,6 +230,7 @@ class LearningEntriesApiHandler:
             return format_lambda_response(404, {"message": "Resource not found."})
 
     def _route_post_request(self, event: dict, user_id: str) -> dict:
+        _LOGGER.info("Handling POST request")
         path = get_path(event)
         path_params = get_path_parameters(event)
 
@@ -263,7 +265,7 @@ class LearningEntriesApiHandler:
             return format_lambda_response(404, {"message": "Resource not found."})
 
     def handle(self, event: dict) -> dict:
-        _LOGGER.info(f"Handler.handle invoked for path: {event.get('path')}, method: {event.get('httpMethod')}")
+        _LOGGER.info(f"Handler.handle invoked for path: {get_path(event)}, method: {get_method(event)}")
         user_id = get_user_id_from_event(event)
         if not user_id:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
@@ -274,10 +276,10 @@ class LearningEntriesApiHandler:
         try:
             if http_method == "GET":
                 return self._route_get_request(event, user_id)
-            elif http_method == "PUT":
+            elif http_method == "POST":
                 return self._route_post_request(event, user_id)
             else:
-                _LOGGER.warning("Unsupported HTTP method for /progress: %s", http_method)
+                _LOGGER.warning("Unsupported HTTP method for /learning-entries: %s", http_method)
                 return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed on /progress."})
 
         except ValidationError as ve:
@@ -301,6 +303,8 @@ class LearningEntriesApiHandler:
 
 def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
+    _LOGGER.warning(event)
+
     try:
         learning_entries_table_dal = LearningEntriesTable(get_learning_entries_table_name())
         chatbot_secrets_manager = ChatBotSecrets()
