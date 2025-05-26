@@ -1,6 +1,6 @@
 #!/usr/bin/env python3
 import json
-from unittest.mock import Mock
+from unittest.mock import MagicMock, Mock
 
 from aws_src_sample.lambdas.learning_entries_lambda import LearningEntriesApiHandler
 from aws_src_sample.models.learning_entry_models import ReflectionVersionItemModel
@@ -14,9 +14,10 @@ def add_authorizier_info(event: dict, user_id: str) -> None:
 
 def test_learning_entries_api_handler_1():
     learning_entries_table = Mock()
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     assert ret.learning_entries_table == learning_entries_table
     assert ret.chatbot_secrets_manager == secrets_manager
     assert ret.chatbot_wrapper == chatbot_wrapper
@@ -29,9 +30,10 @@ def test_learning_entries_api_handler_handle_error_1():
     event = {}
 
     learning_entries_table = Mock()
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 401
@@ -45,9 +47,10 @@ def test_learning_entries_api_handler_handle_error_2():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 405
@@ -67,9 +70,10 @@ def test_learning_entries_api_handler_handle_get_reflections_1():
 
     learning_entries_table = Mock()
     learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
@@ -92,9 +96,10 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
 
     learning_entries_table = Mock()
     learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
@@ -165,9 +170,10 @@ def test_learning_entries_api_handler_handle_get_reflection_3():
 
     learning_entries_table = Mock()
     learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
@@ -188,9 +194,10 @@ def test_learning_entries_api_handler_handle_get_finalized_1():
 
     learning_entries_table = Mock()
     learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
@@ -211,9 +218,10 @@ def test_learning_entries_api_handler_handle_get_finalized_2():
 
     learning_entries_table = Mock()
     learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
@@ -237,9 +245,10 @@ def test_learning_entries_api_handler_handle_post_reflection_1():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 400
@@ -262,9 +271,10 @@ def test_learning_entries_api_handler_handle_post_reflection_2():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
+    throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 400
@@ -305,10 +315,16 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
         aiAssessment="mostly",
         isFinal=False,
     )
+    throttle_table = Mock()
+    mock_context_manager = MagicMock()
+    mock_context_manager.__enter__.return_value = None
+    mock_context_manager.__exit__.return_value = None
+    throttle_table.throttle_action.return_value = mock_context_manager
+
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
     chatbot_wrapper.call_api.return_value = ChatBotFeedback("looks good", "mostly")
-    ret = LearningEntriesApiHandler(learning_entries_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 
     assert response["statusCode"] == 201

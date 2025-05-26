@@ -31,7 +31,7 @@ def get_user_progress_table_name() -> str:
     return table_name
 
 
-def get_throttling_table_name() -> str:
+def get_throttle_table_name() -> str:
     table_name = os.environ.get("THROTTLING_TABLE_NAME")
     if not table_name:
         raise ValueError("Missing environment variable: THROTTLING_TABLE_NAME")

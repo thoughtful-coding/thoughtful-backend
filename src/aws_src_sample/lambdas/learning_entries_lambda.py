@@ -7,6 +7,10 @@ from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
 from aws_src_sample.dynamodb.learning_entries_table import LearningEntriesTable
+from aws_src_sample.dynamodb.throttle_table import (
+    ThrottleRateLimitExceededException,
+    ThrottleTable,
+)
 from aws_src_sample.models.learning_entry_models import (
     ListOfFinalLearningEntriesResponseModel,
     ListOfReflectionDraftsResponseModel,
@@ -22,7 +26,10 @@ from aws_src_sample.utils.apig_utils import (
     get_query_string_parameters,
     get_user_id_from_event,
 )
-from aws_src_sample.utils.aws_env_vars import get_learning_entries_table_name
+from aws_src_sample.utils.aws_env_vars import (
+    get_learning_entries_table_name,
+    get_throttle_table_name,
+)
 from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
 
 _LOGGER = logging.getLogger(__name__)
@@ -33,10 +40,12 @@ class LearningEntriesApiHandler:
     def __init__(
         self,
         learning_entries_table: LearningEntriesTable,
+        throttle_table: ThrottleTable,
         chatbot_secrets_manager: ChatBotSecrets,
         chatbot_wrapper: ChatBotWrapper,
     ):
         self.learning_entries_table = learning_entries_table
+        self.throttle_table = throttle_table
         self.chatbot_secrets_manager = chatbot_secrets_manager
         self.chatbot_wrapper = chatbot_wrapper
 
@@ -53,12 +62,13 @@ class LearningEntriesApiHandler:
         """
         _LOGGER.info(f"Processing DRAFT submission for {user_id}, {lesson_id}#{section_id}")
 
-        ai_response = self.chatbot_wrapper.call_api(
-            chatbot_api_key=self.chatbot_secrets_manager.get_chatbot_api_key(),
-            topic=interaction_input.userTopic,
-            code=interaction_input.userCode,
-            explanation=interaction_input.userExplanation,
-        )
+        with self.throttle_table.throttle_action(user_id, "CHATBOT_API_CALL"):
+            ai_response = self.chatbot_wrapper.call_api(
+                chatbot_api_key=self.chatbot_secrets_manager.get_chatbot_api_key(),
+                topic=interaction_input.userTopic,
+                code=interaction_input.userCode,
+                explanation=interaction_input.userExplanation,
+            )
 
         timestamp_dt = datetime.datetime.now(datetime.timezone.utc)
         version_id_sk_format = f"{lesson_id}#{section_id}#{timestamp_dt.isoformat().replace('+00:00', 'Z')}"
@@ -273,17 +283,21 @@ class LearningEntriesApiHandler:
         except ValidationError as ve:
             _LOGGER.error(f"Pydantic ValidationError in handler: {str(ve)}", exc_info=True)
             return format_lambda_response(400, {"message": "Invalid data.", "details": ve.errors()})
-        except ValueError as ve:  # For business logic errors (e.g., "draft not found")
-            _LOGGER.warning(f"ValueError in handler: {str(ve)}", exc_info=False)  # Often not a server error
+        except ValueError as ve:
+            _LOGGER.warning(f"ValueError in handler: {str(ve)}", exc_info=False)
             return format_lambda_response(400, {"message": str(ve)})
         except (ConnectionError, TimeoutError) as ce:  # AI service issues
             _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
             status_code = 504 if isinstance(ce, TimeoutError) else 503
             return format_lambda_response(status_code, {"message": f"AI service communication error: {str(ce)}"})
-        except ClientError as e:  # DynamoDB issues
+        except ClientError as e:
             _LOGGER.error(f"DynamoDB ClientError in handler: {e.response['Error']['Message']}", exc_info=True)
             return format_lambda_response(500, {"message": f"Database error."})
-        # Removed NotImplementedError for _process_final_submission as it's now implemented
+        except ThrottleRateLimitExceededException as te:
+            _LOGGER.warning(f"Throttling: {te.limit_type} for user {user_id} - {te.message}")
+            # Use the message from the exception, which is already user-friendly
+            return format_lambda_response(429, {"message": te.message, "type": te.limit_type})
+
         except Exception as e:
             _LOGGER.error(f"Unexpected error in API handler: {str(e)}", exc_info=True)
             return format_lambda_response(500, {"message": "An unexpected server error occurred."})
@@ -294,12 +308,14 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.warning(event)
 
     try:
-        learning_entries_table_dal = LearningEntriesTable(get_learning_entries_table_name())
+        learning_entries_table = LearningEntriesTable(get_learning_entries_table_name())
+        throttle_table = ThrottleTable(get_throttle_table_name())
         chatbot_secrets_manager = ChatBotSecrets()
         chatbot_wrapper = ChatBotWrapper()
 
         api_handler = LearningEntriesApiHandler(
-            learning_entries_table=learning_entries_table_dal,
+            learning_entries_table=learning_entries_table,
+            throttle_table=throttle_table,
             chatbot_secrets_manager=chatbot_secrets_manager,
             chatbot_wrapper=chatbot_wrapper,
         )
