@@ -103,9 +103,11 @@ class ReflectionFeedbackAndDraftResponseModel(pydantic.BaseModel):
     Pydantic model for the response when a draft is created (isFinal=false).
     """
 
-    draftEntry: ReflectionVersionItemModel  # This is the DDB item model
+    versionId: str
     aiFeedback: str
     aiAssessment: AssessmentLevel
+    createdAt: str
+    submittedContent: ReflectionVersionItemModel
 
 
 class ListOfReflectionDraftsResponseModel(pydantic.BaseModel):

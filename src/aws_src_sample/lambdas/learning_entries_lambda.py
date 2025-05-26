@@ -94,7 +94,9 @@ class LearningEntriesApiHandler:
 
         # Construct Pydantic response model
         response_model = ReflectionFeedbackAndDraftResponseModel(
-            draftEntry=saved_draft_ddb_item,
+            versionId=saved_draft_ddb_item.versionId,
+            createdAt=saved_draft_ddb_item.createdAt,
+            submittedContent=saved_draft_ddb_item,
             aiFeedback=ai_response.aiFeedback,
             aiAssessment=ai_response.aiAssessment,
         )
