@@ -68,7 +68,6 @@ def aws_credentials() -> typing.Iterator:
 
 @pytest.fixture
 def dynamodb_table_object(aws_credentials) -> typing.Iterator:
-    """Creates the mock DynamoDB table with GSI using moto."""
     with mock_aws():
         dynamodb = boto3.resource("dynamodb", region_name=REGION)
         table = dynamodb.create_table(
@@ -90,9 +89,6 @@ def dynamodb_table_object(aws_credentials) -> typing.Iterator:
                         {"AttributeName": "finalEntryCreatedAt", "KeyType": "RANGE"},
                     ],
                     "Projection": {"ProjectionType": "ALL"},
-                    # For PAY_PER_REQUEST, ProvisionedThroughput is not specified here.
-                    # If using PROVISIONED, you'd add:
-                    # "ProvisionedThroughput": {"ReadCapacityUnits": 5, "WriteCapacityUnits": 5}
                 }
             ],
             BillingMode="PAY_PER_REQUEST",
