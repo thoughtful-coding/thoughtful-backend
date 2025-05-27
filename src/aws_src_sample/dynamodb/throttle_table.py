@@ -9,7 +9,7 @@ from botocore.exceptions import ClientError
 _LOGGER = logging.getLogger(__name__)
 
 
-ThrottleType = typing.Literal["CHATBOT_API_CALL"]
+ThrottleType = typing.Literal["REFLECTION_FEEDBACK_CHATBOT_API_CALL", "PRIMM_FEEDBACK_CHATBOT_API_CALL"]
 LimitType = typing.Literal["USER_MINUTE_LIMIT", "USER_DAILY_LIMIT", "GLOBAL_DAILY_LIMIT"]
 
 

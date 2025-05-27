@@ -19,6 +19,7 @@ def test_learning_entries_api_handler_1():
     chatbot_wrapper = Mock()
     ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     assert ret.learning_entries_table == learning_entries_table
+    assert ret.throttle_table == throttle_table
     assert ret.chatbot_secrets_manager == secrets_manager
     assert ret.chatbot_wrapper == chatbot_wrapper
 
@@ -323,7 +324,7 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
 
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    chatbot_wrapper.call_api.return_value = ChatBotFeedback("looks good", "mostly")
+    chatbot_wrapper.call_reflection_api.return_value = ChatBotFeedback("looks good", "mostly")
     ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
     response = ret.handle(event)
 

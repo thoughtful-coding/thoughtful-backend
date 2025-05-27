@@ -62,8 +62,8 @@ class LearningEntriesApiHandler:
         """
         _LOGGER.info(f"Processing DRAFT submission for {user_id}, {lesson_id}#{section_id}")
 
-        with self.throttle_table.throttle_action(user_id, "CHATBOT_API_CALL"):
-            ai_response = self.chatbot_wrapper.call_api(
+        with self.throttle_table.throttle_action(user_id, "REFLECTION_FEEDBACK_CHATBOT_API_CALL"):
+            ai_response = self.chatbot_wrapper.call_reflection_api(
                 chatbot_api_key=self.chatbot_secrets_manager.get_chatbot_api_key(),
                 topic=interaction_input.userTopic,
                 code=interaction_input.userCode,
@@ -263,7 +263,7 @@ class LearningEntriesApiHandler:
             return format_lambda_response(404, {"message": "Resource not found."})
 
     def handle(self, event: dict) -> dict:
-        _LOGGER.info(f"Handler.handle invoked for path: {get_path(event)}, method: {get_method(event)}")
+        _LOGGER.info(f"Learning.handle invoked for path: {get_path(event)}, method: {get_method(event)}")
         user_id = get_user_id_from_event(event)
         if not user_id:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
