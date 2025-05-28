@@ -16,7 +16,8 @@ def test_primm_feedbackg_api_handler_1():
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper)
+    primm_submissions_table = Mock()
+    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper, primm_submissions_table)
     assert ret.throttle_table == throttle_table
     assert ret.chatbot_secrets_manager == secrets_manager
     assert ret.chatbot_wrapper == chatbot_wrapper
@@ -31,7 +32,8 @@ def test_primm_feedbackg_api_handler_handle_error_1():
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper)
+    primm_submissions_table = Mock()
+    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper, primm_submissions_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 401
@@ -47,7 +49,8 @@ def test_primm_feedbackg_api_handler_handle_error_2():
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper)
+    primm_submissions_table = Mock()
+    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper, primm_submissions_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 405
@@ -70,7 +73,8 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_1():
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper)
+    primm_submissions_table = Mock()
+    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper, primm_submissions_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 400
@@ -94,7 +98,8 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_2():
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
-    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper)
+    primm_submissions_table = Mock()
+    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper, primm_submissions_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 400
@@ -133,13 +138,14 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_3():
 
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
+    primm_submissions_table = Mock()
 
     chatbot_wrapper.call_primm_evaluation_api.return_value = PrimmEvaluationResponseModel(
         aiPredictionAssessment="developing",
         aiExplanationAssessment="mostly",
         aiOverallComment="more work to do",
     )
-    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper)
+    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper, primm_submissions_table)
     response = ret.handle(event)
 
     assert response["statusCode"] == 200

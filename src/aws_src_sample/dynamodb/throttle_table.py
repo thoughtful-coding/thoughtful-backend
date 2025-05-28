@@ -6,6 +6,8 @@ from datetime import datetime, timedelta, timezone
 import boto3
 from botocore.exceptions import ClientError
 
+from aws_src_sample.utils.base_types import UserId
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -29,7 +31,7 @@ class ThrottleRateLimitExceededException(Exception):
 
 
 class ThrottledActionContext:
-    def __init__(self, throttle_table: "ThrottleTable", user_id: str, throttle_type: ThrottleType):
+    def __init__(self, throttle_table: "ThrottleTable", user_id: UserId, throttle_type: ThrottleType):
         self.throttle_table = throttle_table
         self.user_id = user_id
         self.throttle_type: ThrottleType = throttle_type
@@ -116,10 +118,10 @@ class ThrottleTable:
         self.table = self.client.Table(table_name)
         _LOGGER.info(f"ThrottlingStoreTable DAL initialized for table: {table_name}")
 
-    def _get_user_pk(self, user_id: str, throttle_type: ThrottleType) -> str:
+    def _get_user_pk(self, user_id: UserId, throttle_type: ThrottleType) -> str:
         return f"USER#{user_id}#{throttle_type}"
 
-    def _get_global_pk(self, throttle_type: str) -> str:
+    def _get_global_pk(self, throttle_type: ThrottleType) -> str:
         return f"GLOBAL#{throttle_type}"
 
     def _get_ttl_for_daily_item(self, date_str: str) -> int:
@@ -133,7 +135,7 @@ class ThrottleTable:
             # Fallback TTL (e.g., 25 hours from now)
             return int((datetime.now(timezone.utc) + timedelta(hours=25)).timestamp())
 
-    def get_user_minute_timestamp(self, user_id: str, throttle_type: ThrottleType) -> typing.Optional[int]:
+    def get_user_minute_timestamp(self, user_id: UserId, throttle_type: ThrottleType) -> typing.Optional[int]:
         pk = self._get_user_pk(user_id, throttle_type)
         sk = MINUTE_TRACK_SK_PREFIX
         try:
@@ -146,7 +148,7 @@ class ThrottleTable:
             _LOGGER.error(f"DynamoDB error getting user minute timestamp for {pk}: {e.response['Error']['Message']}")
             raise  # Re-raise to be handled by caller
 
-    def get_user_daily_count(self, user_id: str, throttle_type: ThrottleType, date_str: str) -> int:
+    def get_user_daily_count(self, user_id: UserId, throttle_type: ThrottleType, date_str: str) -> int:
         pk = self._get_user_pk(user_id, throttle_type)
         sk = f"{DAILY_COUNT_SK_PREFIX}{date_str}"
         try:
@@ -172,7 +174,7 @@ class ThrottleTable:
             )
             raise
 
-    def update_user_minute_timestamp(self, user_id: str, throttle_type: ThrottleType, timestamp_epoch: int):
+    def update_user_minute_timestamp(self, user_id: UserId, throttle_type: ThrottleType, timestamp_epoch: int):
         pk = self._get_user_pk(user_id, throttle_type)
         sk = MINUTE_TRACK_SK_PREFIX
         try:
@@ -187,7 +189,7 @@ class ThrottleTable:
             raise
 
     def increment_user_daily_count(
-        self, user_id: str, throttle_type: ThrottleType, date_str: str, ttl_epoch: int
+        self, user_id: UserId, throttle_type: ThrottleType, date_str: str, ttl_epoch: int
     ) -> int:
         pk = self._get_user_pk(user_id, throttle_type)
         sk = f"{DAILY_COUNT_SK_PREFIX}{date_str}"
@@ -209,7 +211,11 @@ class ThrottleTable:
             raise
 
     def increment_global_daily_count(
-        self, throttle_type: ThrottleType, date_str: str, ttl_epoch: int, limit: int
+        self,
+        throttle_type: ThrottleType,
+        date_str: str,
+        ttl_epoch: int,
+        limit: int,
     ) -> typing.Optional[int]:
         pk = self._get_global_pk(throttle_type)
         sk = f"{DAILY_COUNT_SK_PREFIX}{date_str}"
@@ -244,7 +250,7 @@ class ThrottleTable:
             )
             raise
 
-    def throttle_action(self, user_id: str, throttle_type: ThrottleType) -> ThrottledActionContext:
+    def throttle_action(self, user_id: UserId, throttle_type: ThrottleType) -> ThrottledActionContext:
         """
         Returns a context manager to handle throttling for the specified action.
         Raises ThrottlingRateLimitExceededException from __enter__ if limits are hit.

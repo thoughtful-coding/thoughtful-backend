@@ -4,6 +4,7 @@ import typing
 
 from pydantic import ValidationError
 
+from aws_src_sample.dynamodb.primm_submissions_table import PrimmSubmissionsTable
 from aws_src_sample.dynamodb.throttle_table import (
     ThrottleRateLimitExceededException,
     ThrottleTable,
@@ -19,7 +20,11 @@ from aws_src_sample.utils.apig_utils import (
     get_path,
     get_user_id_from_event,
 )
-from aws_src_sample.utils.aws_env_vars import get_throttle_table_name
+from aws_src_sample.utils.aws_env_vars import (
+    get_primm_submissions_table_name,
+    get_throttle_table_name,
+)
+from aws_src_sample.utils.base_types import UserId
 from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
 
 _LOGGER = logging.getLogger(__name__)
@@ -32,12 +37,14 @@ class PrimmFeedbackApiHandler:
         throttle_table: ThrottleTable,
         chatbot_secrets_manager: ChatBotSecrets,
         chatbot_wrapper: ChatBotWrapper,
+        primm_submissions_table: PrimmSubmissionsTable,
     ):
         self.throttle_table = throttle_table
         self.chatbot_secrets_manager = chatbot_secrets_manager
         self.chatbot_wrapper = chatbot_wrapper
+        self.primm_submissions_table = primm_submissions_table
 
-    def _handle_post_request(self, event: dict, user_id: str) -> dict:
+    def _handle_post_request(self, event: dict, user_id: UserId) -> dict:
         _LOGGER.info(f"Processing PRIMM feedback request for user_id: {user_id}")
 
         try:
@@ -73,6 +80,17 @@ class PrimmFeedbackApiHandler:
                 user_explanation_text=request_data.user_explanation_text,
                 actual_output_summary=request_data.actual_output_summary,
             )
+            try:
+                save_success = self.primm_submissions_table.save_submission(
+                    user_id=user_id,
+                    request_data=request_data,  # This is PrimmEvaluationRequestModel instance
+                    evaluation_data=ai_eval_response,  # This is PrimmEvaluationResponseModel instance
+                )
+                if not save_success:
+                    _LOGGER.error(f"Failed PRIMM submission save for {user_id}, ex. {request_data.primm_example_id}")
+                    # Continue to return 200 to client as AI feedback was successful
+            except Exception as db_save_ex:
+                _LOGGER.error(f"Exception saving PRIMM submission for user {user_id}: {db_save_ex}", exc_info=True)
 
             return format_lambda_response(200, ai_eval_response.model_dump(by_alias=True, exclude_none=True))
 
@@ -119,11 +137,13 @@ def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
 
     try:
         throttle_table = ThrottleTable(get_throttle_table_name())
+        primm_submissions_table = PrimmSubmissionsTable(get_primm_submissions_table_name())
         chatbot_secrets_manager = ChatBotSecrets()
         chatbot_wrapper = ChatBotWrapper()
 
         api_handler = PrimmFeedbackApiHandler(
             throttle_table=throttle_table,
+            primm_submissions_table=primm_submissions_table,
             chatbot_secrets_manager=chatbot_secrets_manager,
             chatbot_wrapper=chatbot_wrapper,
         )

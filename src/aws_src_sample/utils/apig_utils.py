@@ -3,6 +3,8 @@ import json
 import logging
 import typing
 
+from aws_src_sample.utils.base_types import UserId
+
 _LOGGER = logging.getLogger(__name__)
 
 
@@ -29,17 +31,17 @@ def get_query_string_parameters(event) -> dict[str, str]:
     return event.get("requestContext", {}).get("http", {}).get("queryStringParameters", {})
 
 
-def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[str]:
+def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[UserId]:
     """
     Extracts user ID from Lambda event context (adapt to your authorizer).
     """
     try:
         user_id = event.get("requestContext", {}).get("authorizer", {}).get("jwt", {}).get("claims", {}).get("email")
         if user_id:
-            return str(user_id)
+            return UserId(str(user_id))
         user_id = event.get("requestContext", {}).get("authorizer", {}).get("principalId")
         if user_id:
-            return str(user_id)
+            return UserId(str(user_id))
         _LOGGER.warning("User ID not found in authorizer context.")
         return None
     except Exception as e:
