@@ -3,9 +3,10 @@ import typing
 from datetime import datetime, timezone
 
 import boto3
-from boto3.dynamodb.conditions import Key
+from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
-from utils.base_types import InstructorId, UserId
+
+from aws_src_sample.utils.base_types import InstructorId, UserId
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
