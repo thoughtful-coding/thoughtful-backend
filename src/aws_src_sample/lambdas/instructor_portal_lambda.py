@@ -87,7 +87,7 @@ class InstructorPortalApiHandler:
             return format_lambda_response(500, {"message": "An unexpected server error occurred."})
 
 
-def teacher_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
+def instructor_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
     _LOGGER.warning(event)
 
