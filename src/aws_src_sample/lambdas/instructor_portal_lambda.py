@@ -118,7 +118,7 @@ class InstructorPortalApiHandler:
         http_method = get_method(event).upper()
         path = get_path(event)
 
-        _LOGGER.info(f"Received method: {http_method}, path: {path} for instructor_id: {instructor_id}")
+        _LOGGER.info(f"Received method: {http_method}, path: {path}, instructor_id: {instructor_id}")
 
         try:
             if http_method == "GET" and path == "/instructor/students":
