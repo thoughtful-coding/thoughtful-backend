@@ -1,5 +1,7 @@
 # src/aws_src_sample/lambdas/teacher_portal_api_lambda.py
+import json
 import logging
+import os
 import typing
 
 from aws_src_sample.dynamodb.learning_entries_table import LearningEntriesTable
@@ -7,8 +9,10 @@ from aws_src_sample.dynamodb.primm_submissions_table import PrimmSubmissionsTabl
 from aws_src_sample.dynamodb.user_permissions_table import UserPermissionsTable
 from aws_src_sample.dynamodb.user_progress_table import UserProgressTable
 from aws_src_sample.models.instructor_portal_models import (
+    ClassUnitProgressResponseModel,
     InstructorStudentInfoModel,
     ListOfInstructorStudentsResponseModel,
+    StudentUnitCompletionDataModel,
 )
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
@@ -22,7 +26,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_user_permissions_table_name,
     get_user_progress_table_name,
 )
-from aws_src_sample.utils.base_types import InstructorId
+from aws_src_sample.utils.base_types import InstructorId, UnitId, UserId
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -41,26 +45,67 @@ class InstructorPortalApiHandler:
         self.learning_entries_table = learning_entries_table
         self.primm_submissions_table = primm_submissions_table
 
-    def _handle_get_instructor_students(self, instructor_user_id: InstructorId) -> dict:
-        _LOGGER.info(f"Fetching permitted students for instructor_id: {instructor_user_id}")
+    def _handle_get_instructor_students(self, instructor_id: InstructorId) -> dict:
+        _LOGGER.info(f"Fetching permitted students for instructor_id: {instructor_id}")
 
         try:
-            student_ids = self.user_permissions_table.get_permitted_student_ids_for_teacher(
-                teacher_user_id=instructor_user_id,
+            user_ids = self.user_permissions_table.get_permitted_student_ids_for_teacher(
+                teacher_user_id=instructor_id,
                 permission_type="VIEW_STUDENT_DATA_FULL",
             )
 
             student_infos: list[InstructorStudentInfoModel] = []
-            for s_id in student_ids:
-                # For POC, we just have studentId. Name/email enrichment is a future step.
-                student_infos.append(InstructorStudentInfoModel(studentId=s_id, studentEmail=None, studentName=None))
+            for user_id in user_ids:
+                student_infos.append(
+                    InstructorStudentInfoModel(
+                        studentId=user_id,
+                        studentName=None,
+                        studentEmail=None,
+                    )
+                )
 
             response_model = ListOfInstructorStudentsResponseModel(students=student_infos)
             return format_lambda_response(200, response_model.model_dump(by_alias=True, exclude_none=True))
 
-        except Exception as e:  # Catch any errors from DAL or list processing
-            _LOGGER.error(f"Error in for {instructor_user_id}: {e}", exc_info=True)
+        except Exception as e:
+            _LOGGER.error(f"Error in for {instructor_id}: {e}", exc_info=True)
             return format_lambda_response(500, {"message": "An error occurred while fetching student list."})
+
+    def _handle_get_class_unit_progress(self, instructor_id: InstructorId, unit_id: UnitId) -> dict:
+        _LOGGER.info(f"Instructor {instructor_id} requesting class progress for unit {unit_id}")
+
+        try:
+            # 1. Get list of students the instructor is permitted to view
+            permitted_user_ids = self.user_permissions_table.get_permitted_student_ids_for_teacher(
+                teacher_user_id=instructor_id,
+                permission_type="VIEW_STUDENT_DATA_FULL",
+            )
+
+            student_progress_data_list: list[StudentUnitCompletionDataModel] = []
+            for user_id in permitted_user_ids:
+                # Fetch only completed sections within the specified unit for this student
+                # The unit_id here acts as a prefix for lesson_ids (e.g., "00_intro")
+                completed_sections_map = self.user_progress_table.get_unit_progress_for_user(
+                    user_id=user_id,
+                    unit_id_prefix=unit_id,
+                )
+                # completed_sections_map is Dict[str(full_lesson_id), list[str(section_id)]]
+
+                student_progress_data_list.append(
+                    StudentUnitCompletionDataModel(studentId=user_id, completedSectionsInUnit=completed_sections_map)
+                )
+
+            response_payload = ClassUnitProgressResponseModel(
+                unitId=unit_id, studentProgressData=student_progress_data_list
+            )
+            return format_lambda_response(200, response_payload.model_dump(by_alias=True, exclude_none=True))
+
+        except Exception as e:
+            _LOGGER.error(
+                f"Error in _handle_get_class_unit_progress for instructor {instructor_id}, unit {unit_id}: {e}",
+                exc_info=True,
+            )
+            return format_lambda_response(500, {"message": "An error occurred while fetching class unit progress."})
 
     def handle(self, event: dict) -> dict:
         # Extract instructor_user_id from the authenticated user
@@ -78,18 +123,44 @@ class InstructorPortalApiHandler:
         try:
             if http_method == "GET" and path == "/instructor/students":
                 return self._handle_get_instructor_students(instructor_id)
+
+            elif http_method == "GET" and path.startswith("/instructor/units/") and path.endswith("/class-progress"):
+                # Path: /instructor/units/{unitId}/class-progress
+                parts = path.split("/")  # ['', 'instructor', 'units', unitId, 'class-progress']
+                if (
+                    len(parts) == 5
+                    and parts[1] == "instructor"
+                    and parts[2] == "units"
+                    and parts[4] == "class-progress"
+                ):
+                    unit_id = UnitId(parts[3])
+                    return self._handle_get_class_unit_progress(instructor_id, unit_id)
+                else:
+                    _LOGGER.warning(f"Malformed path for class unit progress: {path}")
+                    return format_lambda_response(400, {"message": "Malformed URL for class unit progress."})
+
+            # Placeholder for GET /instructor/students/{studentId}/units/{unitId}/progress
+            # This endpoint would be very similar to _handle_get_class_unit_progress but for a single student
+            # and would involve a permission check for that specific student first.
+            # For now, the client will derive this from the batch class-progress endpoint.
+
             else:
-                _LOGGER.warning(f"Unsupported path or method: {http_method} {path}")
+                _LOGGER.warning(f"Unsupported path or method for Teacher Portal: {http_method} {path}")
                 return format_lambda_response(404, {"message": "Resource not found or method not allowed."})
 
         except Exception as e:
-            _LOGGER.error(f"Unexpected error in for instructor {instructor_id}: {str(e)}", exc_info=True)
+            _LOGGER.error(
+                f"Unexpected error in TeacherPortalApiHandler for instructor {instructor_id}: {str(e)}",
+                exc_info=True,
+            )
             return format_lambda_response(500, {"message": "An unexpected server error occurred."})
 
 
+# Global Lambda handler function (remains mostly the same, ensures UserProgressTable DAL is passed)
 def instructor_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
-    _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
-    _LOGGER.warning(event)
+    http_method = event.get("requestContext", {}).get("http", {}).get("method", "UNKNOWN_METHOD")
+    path = event.get("requestContext", {}).get("http", {}).get("path", "UNKNOWN_PATH")
+    _LOGGER.info(f"instructor_portal_lambda_handler invoked. Method: {http_method}, Path: {path}")
 
     try:
         user_permissions_table = UserPermissionsTable(get_user_permissions_table_name())

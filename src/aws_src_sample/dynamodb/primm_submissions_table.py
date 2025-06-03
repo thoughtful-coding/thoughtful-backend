@@ -12,7 +12,7 @@ from aws_src_sample.models.primm_feedback_models import (
     PrimmEvaluationRequestModel,
     PrimmEvaluationResponseModel,
 )
-from aws_src_sample.utils.base_types import UserId
+from aws_src_sample.utils.base_types import IsoTimestamp, LessonId, SectionId, UserId
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -31,7 +31,13 @@ class PrimmSubmissionsTable:
         self.table = self.client.Table(table_name)
         _LOGGER.info(f"PrimmSubmissionsTableDal initialized for table: {table_name}")
 
-    def _make_submission_sk(self, lesson_id: str, section_id: str, primm_example_id: str, timestamp_iso: str) -> str:
+    def _make_submission_sk(
+        self,
+        lesson_id: LessonId,
+        section_id: SectionId,
+        primm_example_id: str,
+        timestamp_iso: IsoTimestamp,
+    ) -> str:
         return f"{lesson_id}#{section_id}#{primm_example_id}#{timestamp_iso}"
 
     def save_submission(
@@ -39,13 +45,13 @@ class PrimmSubmissionsTable:
         user_id: UserId,
         request_data: PrimmEvaluationRequestModel,
         evaluation_data: PrimmEvaluationResponseModel,
-        timestamp_iso: typing.Optional[str] = None,
+        timestamp_iso: typing.Optional[IsoTimestamp] = None,
     ) -> bool:
         """
         Saves a PRIMM submission including the user's input and AI evaluation.
         """
         if timestamp_iso is None:
-            timestamp_iso = datetime.now(timezone.utc).isoformat()
+            timestamp_iso = IsoTimestamp(datetime.now(timezone.utc).isoformat())
 
         submission_sk = self._make_submission_sk(
             request_data.lesson_id, request_data.section_id, request_data.primm_example_id, timestamp_iso

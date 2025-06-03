@@ -7,6 +7,7 @@ from boto3.dynamodb.conditions import Attr, Key
 from botocore.exceptions import ClientError
 
 from aws_src_sample.models.learning_entry_models import ReflectionVersionItemModel
+from aws_src_sample.utils.base_types import LessonId, SectionId, UserId
 
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
@@ -69,9 +70,9 @@ class LearningEntriesTable:
 
     def get_draft_versions_for_section(
         self,
-        user_id: str,
-        lesson_id: str,
-        section_id: str,
+        user_id: UserId,
+        lesson_id: LessonId,
+        section_id: SectionId,
         limit: int = 20,
         last_evaluated_key: typing.Optional[dict[str, typing.Any]] = None,
     ) -> tuple[list[ReflectionVersionItemModel], typing.Optional[dict[str, typing.Any]]]:
@@ -106,7 +107,10 @@ class LearningEntriesTable:
             raise
 
     def get_finalized_entries_for_user(
-        self, user_id: str, limit: int = 50, last_evaluated_key: typing.Optional[dict[str, typing.Any]] = None
+        self,
+        user_id: UserId,
+        limit: int = 50,
+        last_evaluated_key: typing.Optional[dict[str, typing.Any]] = None,
     ) -> tuple[list[ReflectionVersionItemModel], typing.Optional[dict[str, typing.Any]]]:
         """
         Retrieves finalized learning entries (isFinal=true) for a user via GSI.
@@ -139,7 +143,7 @@ class LearningEntriesTable:
             )
             raise
 
-    def get_version_by_id(self, user_id: str, version_id: str) -> typing.Optional[ReflectionVersionItemModel]:
+    def get_version_by_id(self, user_id: UserId, version_id: str) -> typing.Optional[ReflectionVersionItemModel]:
         """
         Retrieves a single reflection version by its composite versionId (SK).
         Returns a Pydantic model instance or None if not found.
@@ -167,7 +171,10 @@ class LearningEntriesTable:
             raise
 
     def get_most_recent_draft_for_section(
-        self, user_id: str, lesson_id: str, section_id: str
+        self,
+        user_id: UserId,
+        lesson_id: LessonId,
+        section_id: SectionId,
     ) -> typing.Optional[ReflectionVersionItemModel]:
         """
         Retrieves the most recent draft version (isFinal=false) for a specific user, lesson, and section.

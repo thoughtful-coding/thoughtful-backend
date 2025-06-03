@@ -16,6 +16,7 @@ from aws_src_sample.utils.apig_utils import (
     get_user_id_from_event,
 )
 from aws_src_sample.utils.aws_env_vars import get_user_progress_table_name
+from aws_src_sample.utils.base_types import UserId
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -25,10 +26,10 @@ class UserProgressApiHandler:
     def __init__(self, user_progress_table: UserProgressTable) -> None:
         self.user_progress_table = user_progress_table
 
-    def _handle_get_request(self, user_id: str) -> dict[str, typing.Any]:
+    def _handle_get_request(self, user_id: UserId) -> dict[str, typing.Any]:
         _LOGGER.info("Handler: Processing GET /progress for user_id: %s", user_id)
         try:
-            progress_model = self.user_progress_table.get_progress(user_id=user_id)
+            progress_model = self.user_progress_table.get_user_progress(user_id=user_id)
             if not progress_model:
                 progress_model = UserProgressModel(userId=user_id, completion={})
 
@@ -40,7 +41,7 @@ class UserProgressApiHandler:
                 error_message = f"Database error: {e.response['Error']['Message']}"
             return format_lambda_response(500, {"message": f"Failed to retrieve progress: {error_message}"})
 
-    def _handle_put_request(self, event: dict[str, typing.Any], user_id: str) -> dict[str, typing.Any]:
+    def _handle_put_request(self, event: dict[str, typing.Any], user_id: UserId) -> dict[str, typing.Any]:
         _LOGGER.info("Handler: Processing PUT /progress for user_id: %s", user_id)
         try:
             body_str = event.get("body")
@@ -54,7 +55,7 @@ class UserProgressApiHandler:
             if not batch_input.completions:  # Empty list is valid, but does nothing but update timestamp
                 _LOGGER.info("Received empty completions list for user_id: %s. Only updating timestamp.", user_id)
 
-            updated_progress_model = self.user_progress_table.update_progress(
+            updated_progress_model = self.user_progress_table.update_user_progress(
                 user_id=user_id, completions_to_add=batch_input.completions
             )
 

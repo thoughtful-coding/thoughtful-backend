@@ -30,6 +30,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_learning_entries_table_name,
     get_throttle_table_name,
 )
+from aws_src_sample.utils.base_types import LessonId, SectionId, UserId
 from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,9 +54,9 @@ class LearningEntriesApiHandler:
         self,
         interaction_input: ReflectionInteractionInputModel,
         *,
-        user_id: str,
-        lesson_id: str,
-        section_id: str,
+        user_id: UserId,
+        lesson_id: LessonId,
+        section_id: SectionId,
     ) -> ReflectionVersionItemModel:
         """
         Handles draft submissions (`isFinal: false`): gets AI feedback, saves a new draft.
@@ -97,9 +98,9 @@ class LearningEntriesApiHandler:
         self,
         interaction_input: ReflectionInteractionInputModel,
         *,
-        user_id: str,
-        lesson_id: str,
-        section_id: str,
+        user_id: UserId,
+        lesson_id: LessonId,
+        section_id: SectionId,
     ) -> ReflectionVersionItemModel:
         """
         Handles final submissions (`isFinal: true`).
@@ -161,7 +162,7 @@ class LearningEntriesApiHandler:
         return saved_final_ddb_item
 
     def _handle_get_draft_versions(
-        self, user_id: str, lesson_id: str, section_id: str, query_params: typing.Optional[dict]
+        self, user_id: UserId, lesson_id: LessonId, section_id: SectionId, query_params: typing.Optional[dict]
     ) -> ListOfReflectionDraftsResponseModel:
         _LOGGER.info(f"Fetching DRAFT versions for {user_id}, {lesson_id}#{section_id}")
         limit = 20
@@ -178,13 +179,17 @@ class LearningEntriesApiHandler:
                     _LOGGER.warning("Invalid lastEvaluatedKey query param.")
 
         draft_ddb_items, next_last_key = self.learning_entries_table.get_draft_versions_for_section(
-            user_id, lesson_id, section_id, limit=limit, last_evaluated_key=last_key_dict
+            user_id,
+            lesson_id,
+            section_id,
+            limit=limit,
+            last_evaluated_key=last_key_dict,
         )
         # The DAL already returns Pydantic models (ReflectionVersionItemModel)
         return ListOfReflectionDraftsResponseModel(versions=draft_ddb_items, lastEvaluatedKey=next_last_key)
 
     def _handle_get_finalized_entries(
-        self, user_id: str, query_params: typing.Optional[dict]
+        self, user_id: UserId, query_params: typing.Optional[dict]
     ) -> ListOfFinalLearningEntriesResponseModel:
         _LOGGER.info(f"Fetching FINALIZED entries for user {user_id}")
         limit = 50
@@ -208,7 +213,7 @@ class LearningEntriesApiHandler:
         # As per user: GET /learning-entries is NOT enriched. It returns ReflectionVersionItemModel list.
         return ListOfFinalLearningEntriesResponseModel(entries=final_ddb_items, lastEvaluatedKey=next_last_key)
 
-    def _route_get_request(self, event: dict, user_id: str) -> dict:
+    def _route_get_request(self, event: dict, user_id: UserId) -> dict:
         _LOGGER.info("Handling GET request")
         path = get_path(event)
         path_params = get_path_parameters(event)
@@ -218,22 +223,22 @@ class LearningEntriesApiHandler:
             response_model = self._handle_get_finalized_entries(user_id, query_params)
             return format_lambda_response(200, response_model.model_dump(exclude_none=True))
         elif path.startswith("/reflections/") and path_params.get("lessonId") and path_params.get("sectionId"):
-            lesson_id = path_params["lessonId"]
-            section_id = path_params["sectionId"]
+            lesson_id = LessonId(path_params["lessonId"])
+            section_id = SectionId(path_params["sectionId"])
             response_model = self._handle_get_draft_versions(user_id, lesson_id, section_id, query_params)
             return format_lambda_response(200, response_model.model_dump(exclude_none=True))
         else:
             _LOGGER.warning(f"No hit for path: {path}, pp: {path_params}, qp: {query_params}")
             return format_lambda_response(404, {"message": "Resource not found."})
 
-    def _route_post_request(self, event: dict, user_id: str) -> dict:
+    def _route_post_request(self, event: dict, user_id: UserId) -> dict:
         _LOGGER.info("Handling POST request")
         path = get_path(event)
         path_params = get_path_parameters(event)
 
         if path.startswith("/reflections/") and path_params.get("lessonId") and path_params.get("sectionId"):
-            lesson_id = path_params["lessonId"]
-            section_id = path_params["sectionId"]
+            lesson_id = LessonId(path_params["lessonId"])
+            section_id = SectionId(path_params["sectionId"])
 
             try:
                 raw_body = event.get("body") or "{}"

@@ -3,11 +3,12 @@ import typing
 from pydantic import BaseModel, Field
 
 from aws_src_sample.models.learning_entry_models import AssessmentLevel
+from aws_src_sample.utils.base_types import LessonId, SectionId
 
 
 class PrimmEvaluationRequestModel(BaseModel):
-    lesson_id: str = Field(..., alias="lessonId")
-    section_id: str = Field(..., alias="sectionId")
+    lesson_id: LessonId = Field(..., alias="lessonId")
+    section_id: SectionId = Field(..., alias="sectionId")
     primm_example_id: str = Field(..., alias="primmExampleId")
     code_snippet: str = Field(..., alias="codeSnippet")
     user_prediction_prompt_text: str = Field(..., alias="userPredictionPromptText")

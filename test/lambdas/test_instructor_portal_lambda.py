@@ -1,6 +1,5 @@
 #!/usr/bin/env python3
 import json
-import os
 from unittest.mock import Mock
 
 from aws_src_sample.dynamodb.user_progress_table import UserProgressModel
@@ -97,3 +96,56 @@ def test_user_progress_api_handler_handle_get_2():
     assert response["statusCode"] == 200
     body_dict = json.loads(response["body"])
     assert body_dict == {"students": [{"studentId": "p1"}]}
+
+
+def test_user_progress_api_handler_handle_get_3():
+    """
+    Test trying to get data for unit progess when instructor has accesss to no students
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/units/u1/class-progress",
+            }
+        }
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.get_permitted_student_ids_for_teacher.return_value = []
+    ret = create_instructor_portal_api_handler(user_permissions_table=user_permissions_table)
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict == {"studentProgressData": [], "unitId": "u1"}
+
+
+def test_user_progress_api_handler_handle_get_4():
+    """
+    Test trying to get data for unit progess when instructor has accesss to a bunch of students
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/units/u1/class-progress",
+            }
+        }
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
+    user_progress_table = Mock()
+    user_progress_table.get_unit_progress_for_user.return_value = {}
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        user_progress_table=user_progress_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict == {"unitId": "u1", "studentProgressData": [{"studentId": "s1", "completedSectionsInUnit": {}}]}

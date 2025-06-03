@@ -9,6 +9,7 @@ from aws_src_sample.models.user_progress_models import (
     SectionCompletionInputModel,
     UserProgressModel,
 )
+from aws_src_sample.utils.base_types import IsoTimestamp, SectionId, UserId
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -23,7 +24,7 @@ class UserProgressTable:
         self.client = boto3.resource("dynamodb")
         self.table = self.client.Table(table_name)
 
-    def get_progress(self, user_id: str) -> typing.Optional[UserProgressModel]:
+    def get_user_progress(self, user_id: UserId) -> typing.Optional[UserProgressModel]:
         """
         Retrieves a user's progress from DynamoDB.
         :param user_id: The ID of the user.
@@ -46,9 +47,33 @@ class UserProgressTable:
             _LOGGER.exception("Failed to validate progress data for user_id %s from DynamoDB: %s", user_id, str(e_val))
             return None
 
-    def update_progress(
+    def get_unit_progress_for_user(
+        self, user_id: UserId, unit_id_prefix: str
+    ) -> typing.Dict[str, dict[SectionId, IsoTimestamp]]:
+        """
+        Fetches a user's completed sections for lessons belonging to a specific unit.
+        Args:
+            user_id: The ID of the user.
+            unit_id_prefix: The prefix for lesson IDs in this unit (e.g., "00_intro").
+        Returns:
+            A dictionary where keys are full lesson IDs (e.g., "00_intro/lesson_1")
+            and values are sections -> timestamps
+        """
+        user_progress = self.get_user_progress(user_id)
+        if not user_progress or not user_progress.completion:
+            return {}
+
+        unit_completions: typing.Dict[str, dict[SectionId, IsoTimestamp]] = {}
+        for lesson_id_path, sections_completed_map in user_progress.completion.items():
+            # lesson_id_path is like "00_intro/lesson_1"
+            # unit_id_prefix is like "00_intro"
+            if lesson_id_path.startswith(unit_id_prefix + "/"):  # Ensure it's a lesson within the unit
+                unit_completions[lesson_id_path] = sections_completed_map
+        return unit_completions
+
+    def update_user_progress(
         self,
-        user_id: str,
+        user_id: UserId,
         completions_to_add: list[SectionCompletionInputModel],
     ) -> UserProgressModel:
         """
@@ -151,7 +176,7 @@ class UserProgressTable:
             updated_item = response.get("Attributes", {})
             if not updated_item:
                 _LOGGER.error("UpdateItem did not return attributes for user_id: %s", user_id)
-                return self.get_progress(user_id) or UserProgressModel(userId=user_id)
+                return self.get_user_progress(user_id) or UserProgressModel(userId=user_id)
 
             return UserProgressModel.model_validate(updated_item)
 

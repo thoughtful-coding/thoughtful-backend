@@ -3,6 +3,8 @@ import typing
 
 import pydantic
 
+from aws_src_sample.utils.base_types import IsoTimestamp, LessonId, SectionId, UserId
+
 AssessmentLevel = typing.Literal["achieves", "mostly", "developing", "insufficient"]
 
 
@@ -35,18 +37,18 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
     """
 
     versionId: str = pydantic.Field(description="Unique identifier (SK): lessonId#sectionId#createdAtISO")
-    userId: str = pydantic.Field(description="Partition Key")
-    lessonId: str
-    sectionId: str
+    userId: UserId = pydantic.Field(description="Partition Key")
+    lessonId: LessonId
+    sectionId: SectionId
     userTopic: str
     userCode: str
     userExplanation: str
     aiFeedback: typing.Optional[str] = None
     aiAssessment: typing.Optional[AssessmentLevel] = None
-    createdAt: str  # ISO8601 string.
+    createdAt: IsoTimestamp  # ISO8601 string.
     isFinal: bool
     sourceVersionId: typing.Optional[str] = None
-    finalEntryCreatedAt: typing.Optional[str] = None
+    finalEntryCreatedAt: typing.Optional[IsoTimestamp] = None
 
     @pydantic.field_validator("createdAt", "finalEntryCreatedAt", mode="before")
     @classmethod

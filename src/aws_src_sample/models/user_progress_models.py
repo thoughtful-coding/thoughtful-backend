@@ -1,9 +1,11 @@
 from pydantic import BaseModel, Field
 
+from aws_src_sample.utils.base_types import IsoTimestamp, LessonId, SectionId, UserId
+
 
 class SectionCompletionInputModel(BaseModel):
-    lessonId: str
-    sectionId: str
+    lessonId: LessonId
+    sectionId: SectionId
 
 
 class BatchCompletionsInputModel(BaseModel):
@@ -11,6 +13,6 @@ class BatchCompletionsInputModel(BaseModel):
 
 
 class UserProgressModel(BaseModel):
-    userId: str
+    userId: UserId
     # completion structure: lessonId -> sectionId -> timeFirstCompleted
-    completion: dict[str, dict[str, str]] = Field(default_factory=dict)
+    completion: dict[LessonId, dict[SectionId, IsoTimestamp]] = Field(default_factory=dict)
