@@ -175,5 +175,5 @@ def instructor_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
         return api_handler.handle(event)
 
     except Exception as e:
-        _LOGGER.critical(f"Critical error in global handler setup: {str(e)}", exc_info=True)
+        _LOGGER.critical(f"Error in global handler setup: {str(e)}", exc_info=True)
         return format_lambda_response(500, {"message": f"Internal server error during handler setup."})
