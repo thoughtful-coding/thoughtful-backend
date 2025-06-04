@@ -2,7 +2,6 @@
 import json
 from unittest.mock import Mock
 
-from aws_src_sample.dynamodb.user_progress_table import UserProgressModel
 from aws_src_sample.lambdas.instructor_portal_lambda import InstructorPortalApiHandler
 
 
@@ -13,19 +12,19 @@ def add_authorizier_info(event: dict, user_id: str) -> None:
 
 def create_instructor_portal_api_handler(
     user_permissions_table=Mock(),
-    user_progress_table=Mock(),
+    progress_table=Mock(),
     learning_entries_table=Mock(),
     primm_submissions_table=Mock(),
 ) -> InstructorPortalApiHandler:
     ret = InstructorPortalApiHandler(
         user_permissions_table=user_permissions_table,
-        user_progress_table=user_progress_table,
+        progress_table=progress_table,
         learning_entries_table=learning_entries_table,
         primm_submissions_table=primm_submissions_table,
     )
 
     assert ret.user_permissions_table == user_permissions_table
-    assert ret.user_progress_table == user_progress_table
+    assert ret.progress_table == progress_table
     assert ret.learning_entries_table == learning_entries_table
     assert ret.primm_submissions_table == primm_submissions_table
     return ret
@@ -138,11 +137,40 @@ def test_user_progress_api_handler_handle_get_4():
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
-    user_progress_table = Mock()
-    user_progress_table.get_unit_progress_for_user.return_value = {}
+    progress_table = Mock()
+    progress_table.get_user_unit_progress.return_value = {}
     ret = create_instructor_portal_api_handler(
         user_permissions_table=user_permissions_table,
-        user_progress_table=user_progress_table,
+        progress_table=progress_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict == {"unitId": "u1", "studentProgressData": [{"studentId": "s1", "completedSectionsInUnit": {}}]}
+
+
+def test_user_progress_api_handler_handle_get_5():
+    """
+    Test try to get data for a student who hasn't done the given unit
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/units/u1/class-progress",
+            }
+        }
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
+    progress_table = Mock()
+    progress_table.get_user_unit_progress.return_value = None
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        progress_table=progress_table,
     )
     response = ret.handle(event)
 

@@ -1,4 +1,3 @@
-#!/usr/bin/env python3
 import json
 import logging
 import typing
@@ -9,88 +8,103 @@ from aws_src_sample.dynamodb.user_progress_table import UserProgressTable
 from aws_src_sample.models.user_progress_models import (
     BatchCompletionsInputModel,
     UserProgressModel,
+    UserUnitProgressModel,
 )
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
     get_method,
+    get_path,
     get_user_id_from_event,
 )
-from aws_src_sample.utils.aws_env_vars import get_user_progress_table_name
-from aws_src_sample.utils.base_types import UserId
+from aws_src_sample.utils.aws_env_vars import get_progress_table_name
+from aws_src_sample.utils.base_types import (
+    IsoTimestamp,
+    LessonId,
+    SectionId,
+    UnitId,
+    UserId,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
 
 
 class UserProgressApiHandler:
-    def __init__(self, user_progress_table: UserProgressTable) -> None:
-        self.user_progress_table = user_progress_table
+    def __init__(self, progress_table: UserProgressTable):
+        self.progress_table = progress_table
 
-    def _handle_get_request(self, user_id: UserId) -> dict[str, typing.Any]:
-        _LOGGER.info("Handler: Processing GET /progress for user_id: %s", user_id)
+    def _aggregate_unit_progresses_for_user(self, user_id: UserId) -> UserProgressModel:
+        """
+        Fetches all unit-specific progress items for a user and aggregates them
+        into a single UserProgressModel.
+        """
+        progress_items: list[UserUnitProgressModel] = self.progress_table.get_all_unit_progress_for_user(user_id)
+
+        aggregated_completion: dict[UnitId, dict[LessonId, dict[SectionId, IsoTimestamp]]] = {}
+
+        for unit_progress_item in progress_items:
+            if unit_progress_item.completion:
+                aggregated_completion[unit_progress_item.unitId] = unit_progress_item.completion
+
+        return UserProgressModel(userId=user_id, completion=aggregated_completion)
+
+    def _handle_get_request(self, user_id: UserId) -> dict:
+        _LOGGER.info(f"Fetching aggregated progress for user_id: {user_id}")
+        aggregated_progress_model = self._aggregate_unit_progresses_for_user(user_id)
+        return format_lambda_response(200, aggregated_progress_model.model_dump(by_alias=True, exclude_none=True))
+
+    def _handle_put_request(self, event: dict, user_id: UserId) -> dict:
+        _LOGGER.info(f"Updating progress for user_id: {user_id}")
         try:
-            progress_model = self.user_progress_table.get_user_progress(user_id=user_id)
-            if not progress_model:
-                progress_model = UserProgressModel(userId=user_id, completion={})
+            raw_body = event.get("body")
+            if not raw_body:
+                _LOGGER.error("Request body is missing for progress update.")
+                return format_lambda_response(400, {"message": "Request body is missing."})
 
-            return format_lambda_response(200, progress_model.model_dump())
-        except Exception as e:
-            _LOGGER.exception("Error handling GET /progress request for user_id: %s", user_id)
-            error_message = str(e)
-            if hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]:
-                error_message = f"Database error: {e.response['Error']['Message']}"
-            return format_lambda_response(500, {"message": f"Failed to retrieve progress: {error_message}"})
+            batch_input = BatchCompletionsInputModel.model_validate_json(raw_body)
 
-    def _handle_put_request(self, event: dict[str, typing.Any], user_id: UserId) -> dict[str, typing.Any]:
-        _LOGGER.info("Handler: Processing PUT /progress for user_id: %s", user_id)
-        try:
-            body_str = event.get("body")
-            if not body_str:
-                return format_lambda_response(400, {"message": "Missing request body."})
+            if not batch_input.completions:
+                _LOGGER.info(f"No completions provided in PUT request for user {user_id}. Returning current progress.")
+            else:
+                self.progress_table.batch_update_user_progress(user_id, batch_input.completions)
+                _LOGGER.info(f"Batch update processed for user {user_id}.")
 
-            raw_payload = json.loads(body_str)
-            batch_input = BatchCompletionsInputModel.model_validate(raw_payload)
-            _LOGGER.debug("Validated batch_input: %s", batch_input.model_dump_json(indent=2))
+            # After updates, fetch and return the complete aggregated progress
+            # This ensures the client gets the full, consistent state.
+            aggregated_progress_model = self._aggregate_unit_progresses_for_user(user_id)
+            return format_lambda_response(200, aggregated_progress_model.model_dump(by_alias=True, exclude_none=True))
 
-            if not batch_input.completions:  # Empty list is valid, but does nothing but update timestamp
-                _LOGGER.info("Received empty completions list for user_id: %s. Only updating timestamp.", user_id)
-
-            updated_progress_model = self.user_progress_table.update_user_progress(
-                user_id=user_id, completions_to_add=batch_input.completions
+        except ValidationError as e:
+            _LOGGER.error(f"Progress update request body validation error: {e.errors()}", exc_info=True)
+            return format_lambda_response(
+                400, {"message": "Invalid request for progress update.", "details": e.errors()}
             )
-
-            return format_lambda_response(200, updated_progress_model.model_dump())
-
         except json.JSONDecodeError:
-            _LOGGER.exception("Invalid JSON in PUT /progress request body.")
+            _LOGGER.error("Progress update request body is not valid JSON.", exc_info=True)
             return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
-        except ValidationError as ve:
-            _LOGGER.warning("Invalid PUT /progress request payload: %s", ve.errors())
-            return format_lambda_response(400, {"message": "Invalid request payload.", "details": ve.errors()})
-        except Exception as e:
-            _LOGGER.exception("Unexpected error handling PUT /progress request for user_id: %s", user_id)
-            error_message = str(e)
-            if hasattr(e, "response") and "Error" in e.response and "Message" in e.response["Error"]:
-                error_message = f"Database error: {e.response['Error']['Message']}"
-            return format_lambda_response(500, {"message": f"Failed to update progress: {error_message}"})
 
-    def handle(self, event: dict[str, typing.Any]) -> dict[str, typing.Any]:
-        _LOGGER.info("UserProgressApiHandler.handle invoked. Event: %s", str(event))
-
+    def handle(self, event: dict) -> dict:
         user_id = get_user_id_from_event(event)
         if not user_id:
             return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
 
         http_method = get_method(event).upper()
-        _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
+        path = get_path(event)
 
-        if http_method == "GET":
-            return self._handle_get_request(user_id)
-        elif http_method == "PUT":
-            return self._handle_put_request(event, user_id)
-        else:
-            _LOGGER.warning("Unsupported HTTP method for /progress: %s", http_method)
-            return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed on /progress."})
+        _LOGGER.info(f"UserProgressApiHandler: {http_method} {path} for user: {user_id}")
+
+        try:
+            if http_method == "GET" and path == "/progress":
+                return self._handle_get_request(user_id)
+            elif http_method == "PUT" and path == "/progress":
+                return self._handle_put_request(event, user_id)
+            else:
+                _LOGGER.warning(f"Unsupported path or method for User Progress: {http_method} {path}")
+                return format_lambda_response(404, {"message": "Resource not found or method not allowed."})
+
+        except Exception as e:
+            _LOGGER.error(f"Unexpected error in UserProgressApiHandler for user {user_id}: {str(e)}", exc_info=True)
+            return format_lambda_response(500, {"message": "An unexpected server error occurred."})
 
 
 def user_progress_lambda_handler(event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
@@ -98,8 +112,14 @@ def user_progress_lambda_handler(event: dict[str, typing.Any], context: typing.A
     _LOGGER.warning(event)
 
     try:
-        uplh = UserProgressApiHandler(UserProgressTable(get_user_progress_table_name()))
-        return uplh.handle(event)
+        api_handler = UserProgressApiHandler(
+            progress_table=UserProgressTable(get_progress_table_name()),
+        )
+        return api_handler.handle(event)
+
+    except ValueError as ve:
+        _LOGGER.critical(f"Configuration error in user_progress_lambda_handler: {str(ve)}", exc_info=True)
+        return format_lambda_response(500, {"message": f"Server configuration error: {str(ve)}"})
     except Exception as e:
-        _LOGGER.critical("Critical error in global progress handler or instantiation: %s", str(e), exc_info=True)
-        return format_lambda_response(500, {"message": f"Internal server error: {str(e)}"})
+        _LOGGER.critical(f"Error during UserProgressApiHandler: {str(e)}", exc_info=True)
+        return format_lambda_response(500, {"message": "Internal server error during handler setup or processing."})

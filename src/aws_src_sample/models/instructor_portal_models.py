@@ -35,7 +35,7 @@ class StudentUnitCompletionDataModel(BaseModel):
     student_id: UserId = Field(..., alias="studentId")
     # studentName: typing.Optional[str] = Field(None, alias="studentName") # Client can map this from ListOfInstructorStudents
     # Key is full lessonId (e.g., "00_intro/lesson_1")
-    completed_sections_in_unit: typing.Dict[LessonId, dict[SectionId, IsoTimestamp]] = Field(
+    completed_sections_in_unit: dict[LessonId, dict[SectionId, IsoTimestamp]] = Field(
         ..., alias="completedSectionsInUnit"
     )
 

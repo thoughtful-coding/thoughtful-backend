@@ -1,7 +1,4 @@
-# src/aws_src_sample/lambdas/teacher_portal_api_lambda.py
-import json
 import logging
-import os
 import typing
 
 from aws_src_sample.dynamodb.learning_entries_table import LearningEntriesTable
@@ -14,6 +11,7 @@ from aws_src_sample.models.instructor_portal_models import (
     ListOfInstructorStudentsResponseModel,
     StudentUnitCompletionDataModel,
 )
+from aws_src_sample.models.user_progress_models import UserUnitProgressModel
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
     get_method,
@@ -23,8 +21,8 @@ from aws_src_sample.utils.apig_utils import (
 from aws_src_sample.utils.aws_env_vars import (
     get_learning_entries_table_name,
     get_primm_submissions_table_name,
+    get_progress_table_name,
     get_user_permissions_table_name,
-    get_user_progress_table_name,
 )
 from aws_src_sample.utils.base_types import InstructorId, UnitId, UserId
 
@@ -36,12 +34,12 @@ class InstructorPortalApiHandler:
     def __init__(
         self,
         user_permissions_table: UserPermissionsTable,
-        user_progress_table: UserProgressTable,
+        progress_table: UserProgressTable,
         learning_entries_table: LearningEntriesTable,
         primm_submissions_table: PrimmSubmissionsTable,
     ):
         self.user_permissions_table = user_permissions_table
-        self.user_progress_table = user_progress_table
+        self.progress_table = progress_table
         self.learning_entries_table = learning_entries_table
         self.primm_submissions_table = primm_submissions_table
 
@@ -83,16 +81,21 @@ class InstructorPortalApiHandler:
 
             student_progress_data_list: list[StudentUnitCompletionDataModel] = []
             for user_id in permitted_user_ids:
-                # Fetch only completed sections within the specified unit for this student
-                # The unit_id here acts as a prefix for lesson_ids (e.g., "00_intro")
-                completed_sections_map = self.user_progress_table.get_unit_progress_for_user(
+                user_unit_progress = self.progress_table.get_user_unit_progress(
                     user_id=user_id,
-                    unit_id_prefix=unit_id,
+                    unit_id=unit_id,
                 )
-                # completed_sections_map is Dict[str(full_lesson_id), list[str(section_id)]]
+
+                if user_unit_progress:
+                    completion_map = user_unit_progress.completion
+                else:
+                    completion_map = {}
 
                 student_progress_data_list.append(
-                    StudentUnitCompletionDataModel(studentId=user_id, completedSectionsInUnit=completed_sections_map)
+                    StudentUnitCompletionDataModel(
+                        studentId=user_id,
+                        completedSectionsInUnit=completion_map,
+                    )
                 )
 
             response_payload = ClassUnitProgressResponseModel(
@@ -163,16 +166,11 @@ def instructor_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info(f"instructor_portal_lambda_handler invoked. Method: {http_method}, Path: {path}")
 
     try:
-        user_permissions_table = UserPermissionsTable(get_user_permissions_table_name())
-        user_progress_table = UserProgressTable(get_user_progress_table_name())
-        learning_entries_table = LearningEntriesTable(get_learning_entries_table_name())
-        primm_submissions_table = PrimmSubmissionsTable(get_primm_submissions_table_name())
-
         api_handler = InstructorPortalApiHandler(
-            user_permissions_table=user_permissions_table,
-            user_progress_table=user_progress_table,
-            learning_entries_table=learning_entries_table,
-            primm_submissions_table=primm_submissions_table,
+            user_permissions_table=UserPermissionsTable(get_user_permissions_table_name()),
+            progress_table=UserProgressTable(get_progress_table_name()),
+            learning_entries_table=LearningEntriesTable(get_learning_entries_table_name()),
+            primm_submissions_table=PrimmSubmissionsTable(get_primm_submissions_table_name()),
         )
         return api_handler.handle(event)
 
