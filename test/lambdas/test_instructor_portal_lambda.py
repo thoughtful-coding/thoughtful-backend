@@ -287,7 +287,6 @@ def test_user_progress_api_handler_handle_get_9():
         user_permissions_table=user_permissions_table,
         learning_entries_table=learning_entries_table,
     )
-    breakpoint()
     response = ret.handle(event)
 
     assert response["statusCode"] == 200
