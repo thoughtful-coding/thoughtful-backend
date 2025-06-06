@@ -13,8 +13,11 @@ from aws_src_sample.models.instructor_portal_models import (
 )
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
+    get_last_evaluated_key,
     get_method,
+    get_pagination_limit,
     get_path,
+    get_query_string_parameters,
     get_user_id_from_event,
 )
 from aws_src_sample.utils.aws_env_vars import (
@@ -23,7 +26,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_progress_table_name,
     get_user_permissions_table_name,
 )
-from aws_src_sample.utils.base_types import InstructorId, UnitId
+from aws_src_sample.utils.base_types import InstructorId, UnitId, UserId
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -109,6 +112,54 @@ class InstructorPortalApiHandler:
             )
             return format_lambda_response(500, {"message": "An error occurred while fetching class unit progress."})
 
+    def _handle_get_student_learning_entries(
+        self,
+        instructor_id: InstructorId,
+        student_id: UserId,
+        event: dict,
+    ) -> dict:
+        """
+        Handles an instructor's request to view a specific student's finalized learning entries.
+        This mirrors the functionality of the student-facing "Learning Entries" page.
+        """
+        _LOGGER.info(f"Instructor {instructor_id} requesting FINALIZED learning entries for student {student_id}")
+
+        # 1. Permission Check: Ensure the instructor is allowed to view this student's data.
+        has_permission = self.user_permissions_table.check_permission(
+            granter_user_id=student_id,
+            grantee_user_id=instructor_id,
+            permission_type="VIEW_STUDENT_DATA_FULL",  # Or a more specific permission if available
+        )
+        if not has_permission:
+            _LOGGER.warning(f"Forbidden: Instructor {instructor_id} lacks permission for student {student_id}.")
+            return format_lambda_response(403, {"message": "Forbidden"})
+
+        try:
+            query_params = get_query_string_parameters(event)
+
+            final_entries, next_last_key = self.learning_entries_table.get_finalized_entries_for_user(
+                user_id=student_id,
+                limit=get_pagination_limit(query_params),
+                last_evaluated_key=get_last_evaluated_key(query_params),
+            )
+
+            response_payload = {
+                "entries": [item.model_dump(by_alias=True, exclude_none=True) for item in final_entries],
+                "lastEvaluatedKey": next_last_key,
+            }
+
+            return format_lambda_response(200, response_payload)
+
+        except Exception as e:
+            _LOGGER.error(
+                f"Error fetching finalized learning entries for student {student_id}: {e}",
+                exc_info=True,
+            )
+            return format_lambda_response(
+                500,
+                {"message": "An error occurred while fetching learning entries."},
+            )
+
     def handle(self, event: dict) -> dict:
         # Extract instructor_user_id from the authenticated user
         user_id = get_user_id_from_event(event)
@@ -128,7 +179,7 @@ class InstructorPortalApiHandler:
 
             elif http_method == "GET" and path.startswith("/instructor/units/") and path.endswith("/class-progress"):
                 # Path: /instructor/units/{unitId}/class-progress
-                parts = path.split("/")  # ['', 'instructor', 'units', unitId, 'class-progress']
+                parts = path.split("/")
                 if (
                     len(parts) == 5
                     and parts[1] == "instructor"
@@ -141,10 +192,17 @@ class InstructorPortalApiHandler:
                     _LOGGER.warning(f"Malformed path for class unit progress: {path}")
                     return format_lambda_response(400, {"message": "Malformed URL for class unit progress."})
 
-            # Placeholder for GET /instructor/students/{studentId}/units/{unitId}/progress
-            # This endpoint would be very similar to _handle_get_class_unit_progress but for a single student
-            # and would involve a permission check for that specific student first.
-            # For now, the client will derive this from the batch class-progress endpoint.
+            elif (
+                http_method == "GET" and path.startswith("/instructor/students/") and path.endswith("/learning-entries")
+            ):
+                # Path: /instructor/students/{studentId}/learning-entries
+                parts = path.split("/")
+                if len(parts) == 5:
+                    student_id = UserId(parts[3])
+                    return self._handle_get_student_learning_entries(instructor_id, student_id, event)
+                else:
+                    _LOGGER.warning(f"Malformed path for class unit progress: {path}")
+                    return format_lambda_response(400, {"message": "Malformed URL for finalized learning entries."})
 
             else:
                 _LOGGER.warning(f"Unsupported path or method for Teacher Portal: {http_method} {path}")

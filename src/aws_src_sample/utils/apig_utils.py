@@ -35,6 +35,16 @@ def get_query_string_parameters(event: dict) -> QueryParams:
     return event.get("requestContext", {}).get("http", {}).get("queryStringParameters", {})
 
 
+def get_pagination_limit(query_params: typing.Optional[QueryParams]) -> int:
+    limit = 50
+    if query_params and "limit" in query_params:
+        try:
+            limit = int(query_params["limit"])
+        except (ValueError, TypeError):
+            _LOGGER.warning(f"Invalid limit query param: {query_params.get('limit')}")
+    return limit
+
+
 def get_last_evaluated_key(query_params: typing.Optional[QueryParams]) -> typing.Optional[dict[str, typing.Any]]:
     if not query_params:
         return None

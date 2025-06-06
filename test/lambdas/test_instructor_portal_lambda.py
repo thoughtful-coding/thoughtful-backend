@@ -177,3 +177,59 @@ def test_user_progress_api_handler_handle_get_5():
     assert response["statusCode"] == 200
     body_dict = json.loads(response["body"])
     assert body_dict == {"unitId": "u1", "studentProgressData": [{"studentId": "s1", "completedSectionsInUnit": {}}]}
+
+
+def test_user_progress_api_handler_handle_get_6():
+    """
+    Test trying to get data for all student's learning entries w/o perms
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/learning-entries",
+            }
+        }
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = False
+    learning_entries_table = Mock()
+    learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        learning_entries_table=learning_entries_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 403
+
+
+def test_user_progress_api_handler_handle_get_7():
+    """
+    Test trying to get data for all student's learning entries w/o perms
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/learning-entries",
+            }
+        }
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = True
+    learning_entries_table = Mock()
+    learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        learning_entries_table=learning_entries_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict == {"entries": [], "lastEvaluatedKey": None}

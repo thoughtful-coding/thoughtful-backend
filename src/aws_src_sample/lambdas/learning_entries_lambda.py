@@ -23,6 +23,7 @@ from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
     get_last_evaluated_key,
     get_method,
+    get_pagination_limit,
     get_path,
     get_path_parameters,
     get_query_string_parameters,
@@ -194,17 +195,11 @@ class LearningEntriesApiHandler:
         query_params: typing.Optional[QueryParams],
     ) -> ListOfFinalLearningEntriesResponseModel:
         _LOGGER.info(f"Fetching FINALIZED entries for user {user_id}")
-        limit = 50
-        if query_params:
-            try:
-                limit = int(query_params.get("limit", "50"))
-            except ValueError:
-                pass
 
         # DAL returns ReflectionVersionItemModel instances where isFinal=true
         final_ddb_items, next_last_key = self.learning_entries_table.get_finalized_entries_for_user(
             user_id,
-            limit=limit,
+            limit=get_pagination_limit(query_params),
             last_evaluated_key=get_last_evaluated_key(query_params),
         )
 
