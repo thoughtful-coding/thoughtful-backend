@@ -70,7 +70,7 @@ def test_learning_entries_api_handler_handle_get_reflections_1():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    learning_entries_table.get_versions_for_section.return_value = ([], None)
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
@@ -96,7 +96,7 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
     add_authorizier_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    learning_entries_table.get_versions_for_section.return_value = ([], None)
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
@@ -170,7 +170,7 @@ def test_learning_entries_api_handler_handle_get_reflection_3():
     }
 
     learning_entries_table = Mock()
-    learning_entries_table.get_draft_versions_for_section.return_value = ([], None)
+    learning_entries_table.get_versions_for_section.return_value = ([], None)
     throttle_table = Mock()
     secrets_manager = Mock()
     chatbot_wrapper = Mock()

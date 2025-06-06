@@ -233,3 +233,70 @@ def test_user_progress_api_handler_handle_get_7():
     assert response["statusCode"] == 200
     body_dict = json.loads(response["body"])
     assert body_dict == {"entries": [], "lastEvaluatedKey": None}
+
+
+def test_user_progress_api_handler_handle_get_8():
+    """
+    Missing assignment type results in 400
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/units/u1/lessons/l1/sections/s1/assignment-submissions",
+            }
+        },
+        "pathParameters": {"unitId": "u1", "lessonId": "l1", "sectionId": "s1"},
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
+    learning_entries_table = Mock()
+    learning_entries_table.get_versions_for_section.return_value = ([], None)
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        learning_entries_table=learning_entries_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 400
+
+
+def test_user_progress_api_handler_handle_get_9():
+    """
+    Missing assignment type results in 400
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/units/u1/lessons/l1/sections/s1/assignment-submissions",
+            }
+        },
+        "pathParameters": {"unitId": "u1", "lessonId": "l1", "sectionId": "s1"},
+        "queryStringParameters": {"assignmentType": "Reflection"},
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
+    learning_entries_table = Mock()
+    learning_entries_table.get_versions_for_section.return_value = ([], None)
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        learning_entries_table=learning_entries_table,
+    )
+    breakpoint()
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict == {
+        "assignmentType": "Reflection",
+        "unitId": "u1",
+        "lessonId": "l1",
+        "sectionId": "s1",
+        "primmExampleId": None,
+        "submissions": [],
+    }

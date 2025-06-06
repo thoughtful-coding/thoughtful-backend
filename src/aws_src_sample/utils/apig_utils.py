@@ -32,7 +32,7 @@ def get_path_parameters(event: dict) -> dict[str, str]:
 
 
 def get_query_string_parameters(event: dict) -> QueryParams:
-    return event.get("requestContext", {}).get("http", {}).get("queryStringParameters", {})
+    return event.get("queryStringParameters", {})
 
 
 def get_pagination_limit(query_params: typing.Optional[QueryParams]) -> int:

@@ -68,40 +68,45 @@ class LearningEntriesTable:
                 # Decide how to handle: skip item, raise error, etc. For now, skipping.
         return parsed_items
 
-    def get_draft_versions_for_section(
+    def get_versions_for_section(
         self,
         user_id: UserId,
         lesson_id: LessonId,
         section_id: SectionId,
         limit: int = 20,
         last_evaluated_key: typing.Optional[dict[str, typing.Any]] = None,
+        filter_mode: typing.Literal["all", "drafts_only"] = "drafts_only",
     ) -> tuple[list[ReflectionVersionItemModel], typing.Optional[dict[str, typing.Any]]]:
         """
-        Retrieves draft versions (isFinal=false) for a user, lesson, and section.
-        Returns a list of Pydantic models and the pagination key.
+        Retrieves versions for a user, lesson, and section.
+        - filter_mode 'drafts_only': Returns only items where isFinal is false. (Default)
+        - filter_mode 'all': Returns all items for the section.
         """
         sk_prefix = f"{lesson_id}#{section_id}#"
-        logger.info(f"Fetching draft versions for userId: {user_id}, SK prefix: {sk_prefix}")
+        logger.info(f"Fetching versions for userId: {user_id}, SK prefix: {sk_prefix}, mode: {filter_mode}")
 
         query_kwargs: dict[str, typing.Any] = {
             "KeyConditionExpression": Key("userId").eq(user_id) & Key("versionId").begins_with(sk_prefix),
-            "FilterExpression": Attr("isFinal").eq(False),
             "ScanIndexForward": False,  # Newest first
             "Limit": limit,
         }
         if last_evaluated_key:
             query_kwargs["ExclusiveStartKey"] = last_evaluated_key
 
+        # Conditionally add the filter expression based on the new parameter
+        if filter_mode == "drafts_only":
+            query_kwargs["FilterExpression"] = Attr("isFinal").eq(False)
+
         try:
             response = self.table.query(**query_kwargs)
             ddb_items = response.get("Items", [])
             items = self._parse_items(ddb_items)
             new_last_evaluated_key = response.get("LastEvaluatedKey")
-            logger.info(f"Found {len(items)} draft items. Has more: {bool(new_last_evaluated_key)}")
+            logger.info(f"Found {len(items)} items with mode '{filter_mode}'. Has more: {bool(new_last_evaluated_key)}")
             return items, new_last_evaluated_key
         except ClientError as e:
             logger.error(
-                f"Error fetching draft versions for userId: {user_id}, SK prefix: {sk_prefix}: {e.response['Error']['Message']}",
+                f"Error fetching versions for userId: {user_id}, SK prefix: {sk_prefix}: {e.response['Error']['Message']}",
                 exc_info=True,
             )
             raise
@@ -179,7 +184,7 @@ class LearningEntriesTable:
         """
         Retrieves the most recent draft version (isFinal=false) for a specific user, lesson, and section.
         """
-        drafts, _ = self.get_draft_versions_for_section(user_id, lesson_id, section_id, limit=2)  # FIXME: fails w/ 1?
+        drafts, _ = self.get_versions_for_section(user_id, lesson_id, section_id, limit=2, filter_mode="drafts_only")
         if drafts:
             logger.info(f"Found most recent draft for {user_id} - {lesson_id}#{section_id}: {drafts[0].versionId}")
             return drafts[0]

@@ -17,6 +17,7 @@ from aws_src_sample.utils.apig_utils import (
     get_method,
     get_pagination_limit,
     get_path,
+    get_path_parameters,
     get_query_string_parameters,
     get_user_id_from_event,
 )
@@ -26,7 +27,13 @@ from aws_src_sample.utils.aws_env_vars import (
     get_progress_table_name,
     get_user_permissions_table_name,
 )
-from aws_src_sample.utils.base_types import InstructorId, UnitId, UserId
+from aws_src_sample.utils.base_types import (
+    InstructorId,
+    LessonId,
+    SectionId,
+    UnitId,
+    UserId,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -160,6 +167,82 @@ class InstructorPortalApiHandler:
                 {"message": "An error occurred while fetching learning entries."},
             )
 
+    def _handle_get_assignment_submissions(self, instructor_id: InstructorId, event: dict) -> dict:
+        _LOGGER.info(f"Instructor {instructor_id} requesting submissions for a specific assignment.")
+
+        try:
+            path_params = get_path_parameters(event)
+            query_params = get_query_string_parameters(event)
+
+            unit_id = UnitId(path_params.get("unitId"))
+            lesson_id = LessonId(path_params.get("lessonId"))
+            section_id = SectionId(path_params.get("sectionId"))
+            assignment_type = query_params.get("assignmentType")
+            primm_example_id = query_params.get("primmExampleId")
+
+            if not all([unit_id, lesson_id, section_id, assignment_type]):
+                return format_lambda_response(400, {"message": "Missing required path or query parameters."})
+
+            permitted_students = self.user_permissions_table.get_permitted_student_ids_for_teacher(instructor_id)
+            if not permitted_students:
+                return format_lambda_response(200, {"submissions": []})  # No students, so no submissions
+
+            all_student_submissions = []
+            if assignment_type == "Reflection":
+                for student_id in permitted_students:
+                    versions, _ = self.learning_entries_table.get_versions_for_section(
+                        user_id=student_id,
+                        lesson_id=lesson_id,
+                        section_id=section_id,
+                        filter_mode="all",
+                    )
+                    if versions:
+                        # The rest of the logic remains the same
+                        all_student_submissions.append(
+                            {
+                                "studentId": student_id,
+                                "submissionTimestamp": versions[0].createdAt,
+                                "submissionDetails": [v.model_dump(by_alias=True) for v in versions],
+                            }
+                        )
+
+            elif assignment_type == "PRIMM" and primm_example_id:
+                for student_id in permitted_students:
+                    # This DAL method returns a list, as a student could have multiple submissions
+                    primm_submissions, _ = self.primm_submissions_table.get_submissions_by_student(
+                        user_id=student_id,
+                        lesson_id_filter=lesson_id,
+                        section_id_filter=section_id,
+                        primm_example_id_filter=primm_example_id,
+                    )  #
+                    for sub in primm_submissions:
+                        all_student_submissions.append(
+                            {
+                                "studentId": student_id,
+                                "submissionTimestamp": sub["timestampIso"],
+                                "submissionDetails": sub,
+                            }
+                        )
+
+            # Sort all collected submissions from all students by timestamp, newest first
+            all_student_submissions.sort(key=lambda x: x["submissionTimestamp"], reverse=True)
+
+            response_payload = {
+                "assignmentType": assignment_type,
+                "unitId": unit_id,
+                "lessonId": lesson_id,
+                "sectionId": section_id,
+                "primmExampleId": primm_example_id,
+                "submissions": all_student_submissions,
+            }
+            return format_lambda_response(200, response_payload)
+
+        except Exception as e:
+            _LOGGER.error(
+                f"Error in _handle_get_assignment_submissions for instructor {instructor_id}: {e}", exc_info=True
+            )
+            return format_lambda_response(500, {"message": "An error occurred while fetching assignment submissions."})
+
     def handle(self, event: dict) -> dict:
         # Extract instructor_user_id from the authenticated user
         user_id = get_user_id_from_event(event)
@@ -170,6 +253,7 @@ class InstructorPortalApiHandler:
 
         http_method = get_method(event).upper()
         path = get_path(event)
+        path_parts = path.strip("/").split("/")
 
         _LOGGER.info(f"Received method: {http_method}, path: {path}, instructor_id: {instructor_id}")
 
@@ -179,14 +263,13 @@ class InstructorPortalApiHandler:
 
             elif http_method == "GET" and path.startswith("/instructor/units/") and path.endswith("/class-progress"):
                 # Path: /instructor/units/{unitId}/class-progress
-                parts = path.split("/")
                 if (
-                    len(parts) == 5
-                    and parts[1] == "instructor"
-                    and parts[2] == "units"
-                    and parts[4] == "class-progress"
+                    len(path_parts) == 4
+                    and path_parts[0] == "instructor"
+                    and path_parts[1] == "units"
+                    and path_parts[3] == "class-progress"
                 ):
-                    unit_id = UnitId(parts[3])
+                    unit_id = UnitId(path_parts[2])
                     return self._handle_get_class_unit_progress(instructor_id, unit_id)
                 else:
                     _LOGGER.warning(f"Malformed path for class unit progress: {path}")
@@ -196,13 +279,16 @@ class InstructorPortalApiHandler:
                 http_method == "GET" and path.startswith("/instructor/students/") and path.endswith("/learning-entries")
             ):
                 # Path: /instructor/students/{studentId}/learning-entries
-                parts = path.split("/")
-                if len(parts) == 5:
-                    student_id = UserId(parts[3])
+                if len(path_parts) == 4:
+                    student_id = UserId(path_parts[2])
                     return self._handle_get_student_learning_entries(instructor_id, student_id, event)
                 else:
                     _LOGGER.warning(f"Malformed path for class unit progress: {path}")
                     return format_lambda_response(400, {"message": "Malformed URL for finalized learning entries."})
+
+            elif http_method == "GET" and len(path_parts) == 8 and path.endswith("/assignment-submissions"):
+                # Matches /instructor/units/{unitId}/lessons/{lessonId}/sections/{sectionId}/assignment-submissions
+                return self._handle_get_assignment_submissions(instructor_id, event)
 
             else:
                 _LOGGER.warning(f"Unsupported path or method for Teacher Portal: {http_method} {path}")

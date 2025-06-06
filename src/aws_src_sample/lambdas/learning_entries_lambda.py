@@ -172,18 +172,11 @@ class LearningEntriesApiHandler:
         query_params: typing.Optional[QueryParams],
     ) -> ListOfReflectionDraftsResponseModel:
         _LOGGER.info(f"Fetching DRAFT versions for {user_id}, {lesson_id}#{section_id}")
-        limit = 20
-        if query_params:
-            try:
-                limit = int(query_params.get("limit", "20"))
-            except ValueError:
-                pass
-
-        draft_ddb_items, next_last_key = self.learning_entries_table.get_draft_versions_for_section(
+        draft_ddb_items, next_last_key = self.learning_entries_table.get_versions_for_section(
             user_id,
             lesson_id,
             section_id,
-            limit=limit,
+            limit=get_pagination_limit(query_params),
             last_evaluated_key=get_last_evaluated_key(query_params),
         )
         # The DAL already returns Pydantic models (ReflectionVersionItemModel)

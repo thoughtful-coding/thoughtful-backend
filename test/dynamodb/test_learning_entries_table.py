@@ -158,7 +158,12 @@ def test_get_draft_versions_for_section_multiple_items_and_sorting(
     learning_entries_table_instance.save_item(draft3)
     learning_entries_table_instance.save_item(final_item)
 
-    drafts, _ = learning_entries_table_instance.get_draft_versions_for_section(user_id, lesson_id, section_id)
+    drafts, _ = learning_entries_table_instance.get_versions_for_section(
+        user_id,
+        lesson_id,
+        section_id,
+        filter_mode="drafts_only",
+    )
 
     assert len(drafts) == 3
     assert drafts[0].versionId == draft3.versionId  # Newest first due to ScanIndexForward=False
@@ -170,8 +175,11 @@ def test_get_draft_versions_for_section_multiple_items_and_sorting(
 @mock_aws
 def test_get_draft_versions_for_section_empty(learning_entries_table_instance: LearningEntriesTable):
     """Test retrieving drafts when none exist for the section."""
-    drafts, last_key = learning_entries_table_instance.get_draft_versions_for_section(
-        "user-empty-drafts", "l-empty", "s-empty"
+    drafts, last_key = learning_entries_table_instance.get_versions_for_section(
+        "user-empty-drafts",
+        "l-empty",
+        "s-empty",
+        filter_mode="drafts_only",
     )
     assert len(drafts) == 0
     assert last_key is None
@@ -192,8 +200,12 @@ def test_get_draft_versions_pagination(learning_entries_table_instance: Learning
         learning_entries_table_instance.save_item(item)
 
     # Get first page (limit 2)
-    page1_items, last_key1 = learning_entries_table_instance.get_draft_versions_for_section(
-        user_id, lesson_id, section_id, limit=2
+    page1_items, last_key1 = learning_entries_table_instance.get_versions_for_section(
+        user_id,
+        lesson_id,
+        section_id,
+        limit=2,
+        filter_mode="drafts_only",
     )
     assert len(page1_items) == 2
     assert last_key1 is not None
@@ -202,8 +214,13 @@ def test_get_draft_versions_pagination(learning_entries_table_instance: Learning
     assert page1_items[1].aiFeedback == "Feedback 3"
 
     # Get second page
-    page2_items, last_key2 = learning_entries_table_instance.get_draft_versions_for_section(
-        user_id, lesson_id, section_id, limit=2, last_evaluated_key=last_key1
+    page2_items, last_key2 = learning_entries_table_instance.get_versions_for_section(
+        user_id,
+        lesson_id,
+        section_id,
+        limit=2,
+        last_evaluated_key=last_key1,
+        filter_mode="drafts_only",
     )
     assert len(page2_items) == 2
     assert last_key2 is not None
@@ -212,8 +229,13 @@ def test_get_draft_versions_pagination(learning_entries_table_instance: Learning
     assert page2_items[1].aiFeedback == "Feedback 1"
 
     # Get third page (should have 1 item)
-    page3_items, last_key3 = learning_entries_table_instance.get_draft_versions_for_section(
-        user_id, lesson_id, section_id, limit=2, last_evaluated_key=last_key2
+    page3_items, last_key3 = learning_entries_table_instance.get_versions_for_section(
+        user_id,
+        lesson_id,
+        section_id,
+        limit=2,
+        last_evaluated_key=last_key2,
+        filter_mode="drafts_only",
     )
     assert len(page3_items) == 1
     assert last_key3 is None  # No more items
