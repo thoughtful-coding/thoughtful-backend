@@ -8,6 +8,10 @@ from aws_src_sample.utils.base_types import UserId
 _LOGGER = logging.getLogger(__name__)
 
 
+PathParams = typing.NewType("PathParams", dict[str, str])
+QueryParams = typing.NewType("QueryParams", dict[str, str])
+
+
 def get_event_body(event: dict) -> bytes:
     if "isBase64Encoded" in event and event["isBase64Encoded"]:
         return base64.b64decode(event["body"])
@@ -27,8 +31,21 @@ def get_path_parameters(event: dict) -> dict[str, str]:
     return event.get("pathParameters", {})
 
 
-def get_query_string_parameters(event) -> dict[str, str]:
+def get_query_string_parameters(event: dict) -> QueryParams:
     return event.get("requestContext", {}).get("http", {}).get("queryStringParameters", {})
+
+
+def get_last_evaluated_key(query_params: typing.Optional[QueryParams]) -> typing.Optional[dict[str, typing.Any]]:
+    if not query_params:
+        return None
+
+    if "lastEvaluatedKey" in query_params:
+        try:
+            return json.loads(query_params["lastEvaluatedKey"])
+        except json.JSONDecodeError:
+            _LOGGER.warning("Invalid lastEvaluatedKey query param.")
+
+    return None
 
 
 def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[UserId]:

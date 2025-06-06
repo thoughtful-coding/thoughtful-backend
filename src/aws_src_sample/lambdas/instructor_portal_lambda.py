@@ -11,7 +11,6 @@ from aws_src_sample.models.instructor_portal_models import (
     ListOfInstructorStudentsResponseModel,
     StudentUnitCompletionDataModel,
 )
-from aws_src_sample.models.user_progress_models import UserUnitProgressModel
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
     get_method,
@@ -24,7 +23,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_progress_table_name,
     get_user_permissions_table_name,
 )
-from aws_src_sample.utils.base_types import InstructorId, UnitId, UserId
+from aws_src_sample.utils.base_types import InstructorId, UnitId
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)

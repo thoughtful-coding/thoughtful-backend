@@ -19,7 +19,9 @@ from aws_src_sample.models.learning_entry_models import (
 )
 from aws_src_sample.secrets_manager.chatbot_secrets import ChatBotSecrets
 from aws_src_sample.utils.apig_utils import (
+    QueryParams,
     format_lambda_response,
+    get_last_evaluated_key,
     get_method,
     get_path,
     get_path_parameters,
@@ -162,52 +164,48 @@ class LearningEntriesApiHandler:
         return saved_final_ddb_item
 
     def _handle_get_draft_versions(
-        self, user_id: UserId, lesson_id: LessonId, section_id: SectionId, query_params: typing.Optional[dict]
+        self,
+        user_id: UserId,
+        lesson_id: LessonId,
+        section_id: SectionId,
+        query_params: typing.Optional[QueryParams],
     ) -> ListOfReflectionDraftsResponseModel:
         _LOGGER.info(f"Fetching DRAFT versions for {user_id}, {lesson_id}#{section_id}")
         limit = 20
-        last_key_dict: typing.Optional[dict[str, typing.Any]] = None
         if query_params:
             try:
                 limit = int(query_params.get("limit", "20"))
             except ValueError:
                 pass
-            if "lastEvaluatedKey" in query_params:
-                try:
-                    last_key_dict = json.loads(query_params["lastEvaluatedKey"])
-                except json.JSONDecodeError:
-                    _LOGGER.warning("Invalid lastEvaluatedKey query param.")
 
         draft_ddb_items, next_last_key = self.learning_entries_table.get_draft_versions_for_section(
             user_id,
             lesson_id,
             section_id,
             limit=limit,
-            last_evaluated_key=last_key_dict,
+            last_evaluated_key=get_last_evaluated_key(query_params),
         )
         # The DAL already returns Pydantic models (ReflectionVersionItemModel)
         return ListOfReflectionDraftsResponseModel(versions=draft_ddb_items, lastEvaluatedKey=next_last_key)
 
     def _handle_get_finalized_entries(
-        self, user_id: UserId, query_params: typing.Optional[dict]
+        self,
+        user_id: UserId,
+        query_params: typing.Optional[QueryParams],
     ) -> ListOfFinalLearningEntriesResponseModel:
         _LOGGER.info(f"Fetching FINALIZED entries for user {user_id}")
         limit = 50
-        last_key_dict: typing.Optional[dict[str, typing.Any]] = None
         if query_params:
             try:
                 limit = int(query_params.get("limit", "50"))
             except ValueError:
                 pass
-            if "lastEvaluatedKey" in query_params:
-                try:
-                    last_key_dict = json.loads(query_params["lastEvaluatedKey"])
-                except json.JSONDecodeError:
-                    _LOGGER.warning("Invalid lastEvaluatedKey query param.")
 
         # DAL returns ReflectionVersionItemModel instances where isFinal=true
         final_ddb_items, next_last_key = self.learning_entries_table.get_finalized_entries_for_user(
-            user_id, limit=limit, last_evaluated_key=last_key_dict
+            user_id,
+            limit=limit,
+            last_evaluated_key=get_last_evaluated_key(query_params),
         )
 
         # As per user: GET /learning-entries is NOT enriched. It returns ReflectionVersionItemModel list.
