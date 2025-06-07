@@ -3,7 +3,7 @@ import typing
 from pydantic import BaseModel, Field
 
 from aws_src_sample.models.learning_entry_models import AssessmentLevel
-from aws_src_sample.utils.base_types import LessonId, SectionId
+from aws_src_sample.utils.base_types import IsoTimestamp, LessonId, SectionId, UserId
 
 
 class PrimmEvaluationRequestModel(BaseModel):
@@ -25,6 +25,33 @@ class PrimmEvaluationResponseModel(BaseModel):
     ai_prediction_assessment: AssessmentLevel = Field(..., alias="aiPredictionAssessment")
     ai_explanation_assessment: AssessmentLevel = Field(..., alias="aiExplanationAssessment")
     ai_overall_comment: str = Field(..., alias="aiOverallComment")
+
+    class Config:
+        populate_by_name = True
+
+
+class StoredPrimmSubmissionItemModel(BaseModel):
+    # This model represents the full item as stored in DynamoDB
+    userId: UserId
+    submissionCompositeKey: str
+    lessonId: LessonId
+    sectionId: SectionId
+    primmExampleId: str
+    timestampIso: IsoTimestamp
+    createdAt: IsoTimestamp
+
+    # User Input fields from PrimmEvaluationRequestModel
+    codeSnippet: str
+    userPredictionPromptText: str
+    userPredictionText: str
+    userPredictionConfidence: int  # Pydantic will handle Decimal -> int conversion
+    actualOutputSummary: typing.Optional[str] = None
+    userExplanationText: str
+
+    # AI Evaluation fields from PrimmEvaluationResponseModel
+    aiPredictionAssessment: AssessmentLevel
+    aiExplanationAssessment: typing.Optional[AssessmentLevel] = None
+    aiOverallComment: typing.Optional[str] = None
 
     class Config:
         populate_by_name = True

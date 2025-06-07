@@ -11,6 +11,7 @@ from botocore.exceptions import ClientError
 from aws_src_sample.models.primm_feedback_models import (
     PrimmEvaluationRequestModel,
     PrimmEvaluationResponseModel,
+    StoredPrimmSubmissionItemModel,
 )
 from aws_src_sample.utils.base_types import IsoTimestamp, LessonId, SectionId, UserId
 
@@ -108,14 +109,13 @@ class PrimmSubmissionsTable:
         primm_example_id_filter: typing.Optional[str] = None,
         limit: typing.Optional[int] = None,
         last_evaluated_key: typing.Optional[dict] = None,
-    ) -> typing.Tuple[list[dict], typing.Optional[dict]]:
+    ) -> typing.Tuple[list[StoredPrimmSubmissionItemModel], typing.Optional[dict]]:  # Changed return type hint
         """
         Retrieves PRIMM submissions for a student, with optional filtering.
-        Returns a list of submission items (as dicts) and the LastEvaluatedKey for pagination.
+        Returns a list of submission items (as Pydantic models) and the LastEvaluatedKey for pagination.
         """
         key_condition_expression = Key("userId").eq(user_id)
 
-        # Construct begins_with filter for the sort key
         sk_prefix_parts = []
         if lesson_id_filter:
             sk_prefix_parts.append(lesson_id_filter)
@@ -125,27 +125,29 @@ class PrimmSubmissionsTable:
                     sk_prefix_parts.append(primm_example_id_filter)
 
         if sk_prefix_parts:
-            sk_prefix = "#".join(sk_prefix_parts) + "#"  # Add trailing # for begins_with
+            sk_prefix = "#".join(sk_prefix_parts) + "#"
             key_condition_expression = key_condition_expression & Key("submissionCompositeKey").begins_with(sk_prefix)
 
         query_kwargs = {
             "KeyConditionExpression": key_condition_expression,
-            "ScanIndexForward": False,  # Optional: Get newest first if timestamp is last part of SK
+            "ScanIndexForward": False,
         }
         if limit:
             query_kwargs["Limit"] = limit
         if last_evaluated_key:
             query_kwargs["ExclusiveStartKey"] = last_evaluated_key
 
-        submissions: list[dict] = []
+        submissions: list[StoredPrimmSubmissionItemModel] = []  # Changed type hint
         new_last_evaluated_key: typing.Optional[dict] = None
 
         try:
             response = self.table.query(**query_kwargs)
-            submissions.extend(response.get("Items", []))
-            new_last_evaluated_key = response.get("LastEvaluatedKey")
+            # This is the key change: Parse each item with the Pydantic model
+            for item in response.get("Items", []):
+                submissions.append(StoredPrimmSubmissionItemModel.model_validate(item))
 
-            _LOGGER.info(f"Fetched {len(submissions)} PRIMM submissions for user '{user_id}' with filters.")
+            new_last_evaluated_key = response.get("LastEvaluatedKey")
+            _LOGGER.info(f"Fetched and parsed {len(submissions)} PRIMM submissions for user '{user_id}'.")
 
         except ClientError as e:
             _LOGGER.error(f"Error fetching PRIMM submissions for user '{user_id}': {e.response['Error']['Message']}")

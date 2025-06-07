@@ -144,17 +144,17 @@ def test_get_submissions_for_student_multiple_entries(primm_submissions_table_in
     # Get all for user (should be newest first due to ScanIndexForward=False and timestamp in SK)
     submissions, _ = primm_submissions_table_instance.get_submissions_by_student(user_id)
     assert len(submissions) == 3
-    assert submissions[0]["primmExampleId"] == "ex1"  # req3
-    assert submissions[0]["lessonId"] == "l2"
-    assert submissions[1]["primmExampleId"] == "ex2"  # req2
-    assert submissions[2]["primmExampleId"] == "ex1"  # req1
-    assert submissions[2]["lessonId"] == "l1"
+    assert submissions[0].primmExampleId == "ex1"  # req3
+    assert submissions[0].lessonId == "l2"
+    assert submissions[1].primmExampleId == "ex2"  # req2
+    assert submissions[2].primmExampleId == "ex1"  # req1
+    assert submissions[2].lessonId == "l1"
 
     # Filter by lesson
     submissions_l1, _ = primm_submissions_table_instance.get_submissions_by_student(user_id, lesson_id_filter="l1")
     assert len(submissions_l1) == 2
-    assert submissions_l1[0]["primmExampleId"] == "ex2"  # req2
-    assert submissions_l1[1]["primmExampleId"] == "ex1"  # req1
+    assert submissions_l1[0].primmExampleId == "ex2"  # req2
+    assert submissions_l1[1].primmExampleId == "ex1"  # req1
 
     # Filter by lesson and section
     submissions_l1_s1, _ = primm_submissions_table_instance.get_submissions_by_student(
@@ -167,7 +167,7 @@ def test_get_submissions_for_student_multiple_entries(primm_submissions_table_in
         user_id, lesson_id_filter="l1", section_id_filter="s1", primm_example_id_filter="ex2"
     )
     assert len(submissions_l1_s1_ex2) == 1
-    assert submissions_l1_s1_ex2[0]["primmExampleId"] == "ex2"
+    assert submissions_l1_s1_ex2[0].primmExampleId == "ex2"
 
 
 def test_get_submissions_pagination(primm_submissions_table_instance: PrimmSubmissionsTable):
@@ -188,8 +188,8 @@ def test_get_submissions_pagination(primm_submissions_table_instance: PrimmSubmi
     page1_items, last_key1 = primm_submissions_table_instance.get_submissions_by_student(user_id, limit=2)
     assert len(page1_items) == 2
     assert last_key1 is not None
-    assert page1_items[0]["primmExampleId"] == "ex4"  # Newest (smallest timestamp offset)
-    assert page1_items[1]["primmExampleId"] == "ex3"
+    assert page1_items[0].primmExampleId == "ex4"  # Newest (smallest timestamp offset)
+    assert page1_items[1].primmExampleId == "ex3"
 
     # Get second page
     page2_items, last_key2 = primm_submissions_table_instance.get_submissions_by_student(
@@ -197,8 +197,8 @@ def test_get_submissions_pagination(primm_submissions_table_instance: PrimmSubmi
     )
     assert len(page2_items) == 2
     assert last_key2 is not None
-    assert page2_items[0]["primmExampleId"] == "ex2"
-    assert page2_items[1]["primmExampleId"] == "ex1"
+    assert page2_items[0].primmExampleId == "ex2"
+    assert page2_items[1].primmExampleId == "ex1"
 
     # Get third page
     page3_items, last_key3 = primm_submissions_table_instance.get_submissions_by_student(
@@ -206,4 +206,4 @@ def test_get_submissions_pagination(primm_submissions_table_instance: PrimmSubmi
     )
     assert len(page3_items) == 1
     assert last_key3 is None  # No more items
-    assert page3_items[0]["primmExampleId"] == "ex0"
+    assert page3_items[0].primmExampleId == "ex0"

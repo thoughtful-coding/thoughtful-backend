@@ -1,8 +1,10 @@
 #!/usr/bin/env python3
+import decimal
 import json
 from unittest.mock import Mock
 
 from aws_src_sample.lambdas.instructor_portal_lambda import InstructorPortalApiHandler
+from aws_src_sample.models.primm_feedback_models import StoredPrimmSubmissionItemModel
 
 
 def add_authorizier_info(event: dict, user_id: str) -> None:
@@ -299,3 +301,57 @@ def test_user_progress_api_handler_handle_get_9():
         "primmExampleId": None,
         "submissions": [],
     }
+
+
+def test_user_progress_api_handler_handle_get_10():
+    """
+    Missing assignment type results in 400
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/units/u1/lessons/l1/sections/s1/assignment-submissions",
+            }
+        },
+        "pathParameters": {"unitId": "u1", "lessonId": "l1", "sectionId": "s1"},
+        "queryStringParameters": {"assignmentType": "PRIMM", "primmExampleId": "4"},
+    }
+    add_authorizier_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
+    primm_submissions_table = Mock()
+    primm_submission = StoredPrimmSubmissionItemModel(
+        userId="eric.rizzi@gmail.com",
+        submissionCompositeKey="03cff8d8-95340#primm-print-analysis#primm-greetings-line3#2025-06-06T20:21:48.433152+00:00",
+        actualOutputSummary="Hello name it's nice to meet you!",
+        aiExplanationAssessment="insufficient",
+        aiOverallComment="It looks like there's a misunderstanding!",
+        aiPredictionAssessment="insufficient",
+        codeSnippet="# We'll use a fixed name for",
+        createdAt="2025-06-06T20:21:48.433175+00:00",
+        lessonId="03cff8d8-33a0-49ed-98c4-d51613995340",
+        primmExampleId="primm-greetings-line3",
+        sectionId="primm-print-analysis",
+        timestampIso="2025-06-06T20:21:48.433152+00:00",
+        userExplanationText="I was right.",
+        userPredictionConfidence=decimal.Decimal(3),
+        userPredictionPromptText="Look closely",
+        userPredictionText='It will print out "hello alex"',
+    )
+    primm_submissions_table.get_submissions_by_student.return_value = ([primm_submission], None)
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        primm_submissions_table=primm_submissions_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict["assignmentType"] == "PRIMM"
+    assert body_dict["unitId"] == "u1"
+    assert body_dict["lessonId"] == "l1"
+    assert body_dict["sectionId"] == "s1"
+    assert len(body_dict["submissions"]) == 1
+    assert body_dict["submissions"][0]["submissionDetails"]["userPredictionConfidence"] == 3

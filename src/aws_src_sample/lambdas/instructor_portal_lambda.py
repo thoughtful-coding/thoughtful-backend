@@ -208,21 +208,22 @@ class InstructorPortalApiHandler:
 
             elif assignment_type == "PRIMM" and primm_example_id:
                 for student_id in permitted_students:
-                    # This DAL method returns a list, as a student could have multiple submissions
                     primm_submissions, _ = self.primm_submissions_table.get_submissions_by_student(
                         user_id=student_id,
                         lesson_id_filter=lesson_id,
                         section_id_filter=section_id,
                         primm_example_id_filter=primm_example_id,
-                    )  #
+                    )
                     for sub in primm_submissions:
                         all_student_submissions.append(
                             {
                                 "studentId": student_id,
-                                "submissionTimestamp": sub["timestampIso"],
-                                "submissionDetails": sub,
+                                "submissionTimestamp": sub.timestampIso,
+                                "submissionDetails": sub.model_dump(by_alias=True),
                             }
                         )
+            else:
+                raise ValueError("Unhandled assignment type")
 
             # Sort all collected submissions from all students by timestamp, newest first
             all_student_submissions.sort(key=lambda x: x["submissionTimestamp"], reverse=True)
