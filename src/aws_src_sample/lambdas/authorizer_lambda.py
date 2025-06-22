@@ -8,8 +8,11 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
 
 
-# This response structure is required by API Gateway for a Lambda Authorizer
 def _generate_iam_policy(principal_id: str, effect: str, resource: str, context: dict) -> dict:
+    """
+    Generates the IAM policy required by API Gateway Lambda authorizers.
+    The 'resource' should be the ARN of the API Gateway endpoint.
+    """
     return {
         "principalId": principal_id,
         "policyDocument": {
@@ -25,6 +28,9 @@ def authorizer_lambda_handler(event: dict, context: typing.Any) -> dict:
     This function is a Lambda Authorizer for API Gateway. It validates the custom
     access token provided in the Authorization header.
     """
+    _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
+    _LOGGER.warning(event)
+
     try:
         # The token is passed as 'Bearer <token>'
         token = event["headers"]["authorization"].split(" ")[1]
