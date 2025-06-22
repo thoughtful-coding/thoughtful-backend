@@ -5,7 +5,10 @@ import typing
 import boto3
 from botocore.exceptions import ClientError
 
-from aws_src_sample.utils.aws_env_vars import get_chatbot_api_key_secrets_arn
+from aws_src_sample.utils.aws_env_vars import (
+    get_chatbot_api_key_secret_arn,
+    get_jwt_secret_arn,
+)
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -15,7 +18,7 @@ _LOGGER.setLevel(logging.INFO)
 _secrets_cache: dict[str, typing.Any] = {}
 
 
-class ChatBotSecrets:
+class SecretsRepository:
     """
     A repository class to abstract interactions with AWS Secrets Manager,
     including caching of secrets.
@@ -113,8 +116,16 @@ class ChatBotSecrets:
             return raw_secret_string
 
     def get_chatbot_api_key(self) -> str:
-        secret = self._get_secret_value(secret_name=get_chatbot_api_key_secrets_arn())
+        secret = self._get_secret_value(secret_name=get_chatbot_api_key_secret_arn())
         if not secret:
-            _LOGGER.debug("Unable to get API secret")
-            raise KeyError("Couldn't get api secret")
+            _LOGGER.debug("Unable to get ChatBot API secret")
+            raise KeyError("Couldn't get ChatBot API secret")
+        return secret
+
+    def get_jwt_secret_key(self) -> str:
+        """Gets the JWT secret key from AWS Secrets Manager."""
+        secret = self._get_secret_value(secret_name=get_jwt_secret_arn(), json_key="password")
+        if not secret:
+            _LOGGER.error("Unable to get JWT secret key from Secrets Manager")
+            raise KeyError("Couldn't get JWT secret key")
         return secret

@@ -7,7 +7,7 @@ from aws_src_sample.models.learning_entry_models import ReflectionVersionItemMod
 from aws_src_sample.utils.chatbot_utils import ChatBotFeedback
 
 
-def add_authorizier_info(event: dict, user_id: str) -> None:
+def add_authorizer_info(event: dict, user_id: str) -> None:
     assert "authorizer" not in event["requestContext"]
     event["requestContext"]["authorizer"] = {"jwt": {"claims": {"email": user_id}}}
 
@@ -15,12 +15,12 @@ def add_authorizier_info(event: dict, user_id: str) -> None:
 def test_learning_entries_api_handler_1():
     learning_entries_table = Mock()
     throttle_table = Mock()
-    secrets_manager = Mock()
+    secrets_repo = Mock()
     chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
+    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_repo, chatbot_wrapper)
     assert ret.learning_entries_table == learning_entries_table
     assert ret.throttle_table == throttle_table
-    assert ret.chatbot_secrets_manager == secrets_manager
+    assert ret.secrets_repo == secrets_repo
     assert ret.chatbot_wrapper == chatbot_wrapper
 
 
@@ -45,7 +45,7 @@ def test_learning_entries_api_handler_handle_error_2():
     Improper/unhandled method -> "HTTP method not allow"
     """
     event = {"requestContext": {}}
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     throttle_table = Mock()
@@ -67,7 +67,7 @@ def test_learning_entries_api_handler_handle_get_reflections_1():
         },
         "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     learning_entries_table.get_versions_for_section.return_value = ([], None)
@@ -93,7 +93,7 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
         "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
         "queryStringParameters": {"limit": "10", "lastEvaluatedKey": "{}"},
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     learning_entries_table.get_versions_for_section.return_value = ([], None)
@@ -191,7 +191,7 @@ def test_learning_entries_api_handler_handle_get_finalized_1():
             }
         },
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
@@ -215,7 +215,7 @@ def test_learning_entries_api_handler_handle_get_finalized_2():
             }
         },
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
@@ -243,7 +243,7 @@ def test_learning_entries_api_handler_handle_post_reflection_1():
         },
         "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     throttle_table = Mock()
@@ -269,7 +269,7 @@ def test_learning_entries_api_handler_handle_post_reflection_2():
         "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
         "body": "a",
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     throttle_table = Mock()
@@ -300,7 +300,7 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
         "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
         "body": json.dumps(reflection),
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
     learning_entries_table.save_item.return_value = ReflectionVersionItemModel(

@@ -7,7 +7,7 @@ from aws_src_sample.lambdas.instructor_portal_lambda import InstructorPortalApiH
 from aws_src_sample.models.primm_feedback_models import StoredPrimmSubmissionItemModel
 
 
-def add_authorizier_info(event: dict, user_id: str) -> None:
+def add_authorizer_info(event: dict, user_id: str) -> None:
     assert "authorizer" not in event["requestContext"]
     event["requestContext"]["authorizer"] = {"jwt": {"claims": {"email": user_id}}}
 
@@ -53,7 +53,7 @@ def test_user_progress_api_handler_handle_error_2():
     Improper/unhandled method -> "HTTP method not allow"
     """
     event = {"requestContext": {}}
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     ret = create_instructor_portal_api_handler()
     response = ret.handle(event)
@@ -70,7 +70,7 @@ def test_user_progress_api_handler_handle_get_1():
             }
         }
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     ret = create_instructor_portal_api_handler()
     response = ret.handle(event)
@@ -87,7 +87,7 @@ def test_user_progress_api_handler_handle_get_2():
             }
         }
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["p1"]
@@ -111,7 +111,7 @@ def test_user_progress_api_handler_handle_get_3():
             }
         }
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = []
@@ -135,7 +135,7 @@ def test_user_progress_api_handler_handle_get_4():
             }
         }
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
@@ -164,7 +164,7 @@ def test_user_progress_api_handler_handle_get_5():
             }
         }
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
@@ -193,7 +193,7 @@ def test_user_progress_api_handler_handle_get_6():
             }
         }
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.check_permission.return_value = False
@@ -220,7 +220,7 @@ def test_user_progress_api_handler_handle_get_7():
             }
         }
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.check_permission.return_value = True
@@ -250,7 +250,7 @@ def test_user_progress_api_handler_handle_get_8():
         },
         "pathParameters": {"unitId": "u1", "lessonId": "l1", "sectionId": "s1"},
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
@@ -279,7 +279,7 @@ def test_user_progress_api_handler_handle_get_9():
         "pathParameters": {"unitId": "u1", "lessonId": "l1", "sectionId": "s1"},
         "queryStringParameters": {"assignmentType": "Reflection"},
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
@@ -317,7 +317,7 @@ def test_user_progress_api_handler_handle_get_10():
         "pathParameters": {"unitId": "u1", "lessonId": "l1", "sectionId": "s1"},
         "queryStringParameters": {"assignmentType": "PRIMM", "primmExampleId": "4"},
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]

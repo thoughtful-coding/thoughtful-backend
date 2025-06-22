@@ -13,7 +13,7 @@ from aws_src_sample.models.primm_feedback_models import (
     PrimmEvaluationRequestModel,
     PrimmEvaluationResponseModel,
 )
-from aws_src_sample.secrets_manager.chatbot_secrets import ChatBotSecrets
+from aws_src_sample.secrets_manager.secrets_repository import SecretsRepository
 from aws_src_sample.utils.apig_utils import (
     format_lambda_response,
     get_method,
@@ -35,12 +35,12 @@ class PrimmFeedbackApiHandler:
     def __init__(
         self,
         throttle_table: ThrottleTable,
-        chatbot_secrets_manager: ChatBotSecrets,
+        secrets_repo: SecretsRepository,
         chatbot_wrapper: ChatBotWrapper,
         primm_submissions_table: PrimmSubmissionsTable,
     ):
         self.throttle_table = throttle_table
-        self.chatbot_secrets_manager = chatbot_secrets_manager
+        self.secrets_repo = secrets_repo
         self.chatbot_wrapper = chatbot_wrapper
         self.primm_submissions_table = primm_submissions_table
 
@@ -72,7 +72,7 @@ class PrimmFeedbackApiHandler:
             _LOGGER.info(f"Throttling check passed for user {user_id}. Calling ChatBot.")
 
             ai_eval_response: PrimmEvaluationResponseModel = self.chatbot_wrapper.call_primm_evaluation_api(
-                chatbot_api_key=self.chatbot_secrets_manager.get_chatbot_api_key(),
+                chatbot_api_key=self.secrets_repo.get_chatbot_api_key(),
                 code_snippet=request_data.code_snippet,
                 prediction_prompt_text=request_data.user_prediction_prompt_text,
                 user_prediction_text=request_data.user_prediction_text,
@@ -138,13 +138,13 @@ def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
     try:
         throttle_table = ThrottleTable(get_throttle_table_name())
         primm_submissions_table = PrimmSubmissionsTable(get_primm_submissions_table_name())
-        chatbot_secrets_manager = ChatBotSecrets()
+        secrets_repo = SecretsRepository()
         chatbot_wrapper = ChatBotWrapper()
 
         api_handler = PrimmFeedbackApiHandler(
             throttle_table=throttle_table,
             primm_submissions_table=primm_submissions_table,
-            chatbot_secrets_manager=chatbot_secrets_manager,
+            secrets_repo=secrets_repo,
             chatbot_wrapper=chatbot_wrapper,
         )
         return api_handler.handle(event)

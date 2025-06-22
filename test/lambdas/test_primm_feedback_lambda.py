@@ -7,19 +7,19 @@ from aws_src_sample.models.primm_feedback_models import PrimmEvaluationResponseM
 from aws_src_sample.utils.chatbot_utils import ChatBotFeedback
 
 
-def add_authorizier_info(event: dict, user_id: str) -> None:
+def add_authorizer_info(event: dict, user_id: str) -> None:
     assert "authorizer" not in event["requestContext"]
     event["requestContext"]["authorizer"] = {"jwt": {"claims": {"email": user_id}}}
 
 
 def test_primm_feedbackg_api_handler_1():
     throttle_table = Mock()
-    secrets_manager = Mock()
+    secrets_repo = Mock()
     chatbot_wrapper = Mock()
     primm_submissions_table = Mock()
-    ret = PrimmFeedbackApiHandler(throttle_table, secrets_manager, chatbot_wrapper, primm_submissions_table)
+    ret = PrimmFeedbackApiHandler(throttle_table, secrets_repo, chatbot_wrapper, primm_submissions_table)
     assert ret.throttle_table == throttle_table
-    assert ret.chatbot_secrets_manager == secrets_manager
+    assert ret.secrets_repo == secrets_repo
     assert ret.chatbot_wrapper == chatbot_wrapper
 
 
@@ -44,7 +44,7 @@ def test_primm_feedbackg_api_handler_handle_error_2():
     Improper/unhandled method -> "HTTP method not allow"
     """
     event = {"requestContext": {}}
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     throttle_table = Mock()
     secrets_manager = Mock()
@@ -68,7 +68,7 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_1():
             }
         },
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     throttle_table = Mock()
     secrets_manager = Mock()
@@ -93,7 +93,7 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_2():
         },
         "body": "a",
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     throttle_table = Mock()
     secrets_manager = Mock()
@@ -128,7 +128,7 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_3():
         },
         "body": json.dumps(primm_eval),
     }
-    add_authorizier_info(event, "e")
+    add_authorizer_info(event, "e")
 
     throttle_table = Mock()
     mock_context_manager = MagicMock()

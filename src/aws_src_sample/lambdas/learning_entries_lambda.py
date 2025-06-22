@@ -17,7 +17,7 @@ from aws_src_sample.models.learning_entry_models import (
     ReflectionInteractionInputModel,
     ReflectionVersionItemModel,
 )
-from aws_src_sample.secrets_manager.chatbot_secrets import ChatBotSecrets
+from aws_src_sample.secrets_manager.secrets_repository import SecretsRepository
 from aws_src_sample.utils.apig_utils import (
     QueryParams,
     format_lambda_response,
@@ -45,12 +45,12 @@ class LearningEntriesApiHandler:
         self,
         learning_entries_table: LearningEntriesTable,
         throttle_table: ThrottleTable,
-        chatbot_secrets_manager: ChatBotSecrets,
+        secrets_repo: SecretsRepository,
         chatbot_wrapper: ChatBotWrapper,
     ):
         self.learning_entries_table = learning_entries_table
         self.throttle_table = throttle_table
-        self.chatbot_secrets_manager = chatbot_secrets_manager
+        self.secrets_repo = secrets_repo
         self.chatbot_wrapper = chatbot_wrapper
 
     def _process_draft_submission(
@@ -68,7 +68,7 @@ class LearningEntriesApiHandler:
 
         with self.throttle_table.throttle_action(user_id, "REFLECTION_FEEDBACK_CHATBOT_API_CALL"):
             ai_response = self.chatbot_wrapper.call_reflection_api(
-                chatbot_api_key=self.chatbot_secrets_manager.get_chatbot_api_key(),
+                chatbot_api_key=self.secrets_repo.get_chatbot_api_key(),
                 topic=interaction_input.userTopic,
                 code=interaction_input.userCode,
                 explanation=interaction_input.userExplanation,
@@ -301,13 +301,13 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
     try:
         learning_entries_table = LearningEntriesTable(get_learning_entries_table_name())
         throttle_table = ThrottleTable(get_throttle_table_name())
-        chatbot_secrets_manager = ChatBotSecrets()
+        secrets_repo = SecretsRepository()
         chatbot_wrapper = ChatBotWrapper()
 
         api_handler = LearningEntriesApiHandler(
             learning_entries_table=learning_entries_table,
             throttle_table=throttle_table,
-            chatbot_secrets_manager=chatbot_secrets_manager,
+            secrets_repo=secrets_repo,
             chatbot_wrapper=chatbot_wrapper,
         )
         return api_handler.handle(event)

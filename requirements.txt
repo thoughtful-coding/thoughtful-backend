@@ -7,3 +7,4 @@ pydantic
 pytest
 moto
 moto[dynamodb]
+PyJWT
