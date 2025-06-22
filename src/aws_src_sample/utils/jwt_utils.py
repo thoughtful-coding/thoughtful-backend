@@ -6,8 +6,8 @@ import jwt
 from aws_src_sample.secrets_manager.secrets_repository import SecretsRepository
 from aws_src_sample.utils.base_types import AccessTokenId, RefreshTokenId, UserId
 
-ACCESS_TOKEN_EXPIRE_MINUTES = 15
-REFRESH_TOKEN_EXPIRE_DAYS = 30
+ACCESS_TOKEN_EXPIRE_HOURS = 6
+REFRESH_TOKEN_EXPIRE_DAYS = 60
 
 
 class JwtWrapper:
@@ -15,7 +15,7 @@ class JwtWrapper:
         pass
 
     def create_access_token(self, user_id: UserId, secrets_repo: SecretsRepository) -> AccessTokenId:
-        expire = datetime.now(timezone.utc) + timedelta(minutes=ACCESS_TOKEN_EXPIRE_MINUTES)
+        expire = datetime.now(timezone.utc) + timedelta(hours=ACCESS_TOKEN_EXPIRE_HOURS)
         to_encode = {"exp": expire, "sub": user_id}
         return AccessTokenId(jwt.encode(to_encode, secrets_repo.get_jwt_secret_key(), algorithm="HS256"))
 
