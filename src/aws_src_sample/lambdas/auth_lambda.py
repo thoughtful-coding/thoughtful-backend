@@ -45,8 +45,7 @@ class AuthApiHandler:
                 return None
 
             if token_info.get("email_verified") != True:
-                _LOGGER.error(f"Google email '{token_info.get('email')}' is not verified.")
-                return None
+                _LOGGER.warning(f"Google email '{token_info.get('email')}' is not verified.")
 
             return token_info
         except requests.RequestException as e:
