@@ -6,10 +6,7 @@ from unittest.mock import Mock
 from aws_src_sample.lambdas.instructor_portal_lambda import InstructorPortalApiHandler
 from aws_src_sample.models.primm_feedback_models import StoredPrimmSubmissionItemModel
 
-
-def add_authorizer_info(event: dict, user_id: str) -> None:
-    assert "authorizer" not in event["requestContext"]
-    event["requestContext"]["authorizer"] = {"jwt": {"claims": {"email": user_id}}}
+from ..test_utils.authorizer import add_authorizer_info
 
 
 def create_instructor_portal_api_handler(

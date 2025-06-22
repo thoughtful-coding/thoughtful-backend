@@ -1,7 +1,6 @@
 # test/lambdas/test_user_progress_lambda.py
 import json
 import typing
-from datetime import datetime, timedelta, timezone
 from unittest.mock import Mock
 
 from aws_src_sample.lambdas.user_progress_lambda import UserProgressApiHandler
@@ -15,12 +14,7 @@ from aws_src_sample.models.user_progress_models import (
     UserUnitProgressModel,
 )
 
-
-def add_authorizer_info(event: dict, user_id_str: str) -> None:
-    """Adds authorizer info to the event. Uses user_id_str to avoid type conflicts here."""
-    # Ensure requestContext exists
-    event.setdefault("requestContext", {})
-    event["requestContext"]["authorizer"] = {"jwt": {"claims": {"email": user_id_str}}}
+from ..test_utils.authorizer import add_authorizer_info
 
 
 def create_progress_event(

@@ -60,16 +60,21 @@ def get_last_evaluated_key(query_params: typing.Optional[QueryParams]) -> typing
 
 def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[UserId]:
     """
-    Extracts user ID from Lambda event context (adapt to your authorizer).
+    Extracts user ID from the Lambda event context provided by the API Gateway authorizer.
+    This is now configured to read the 'sub' (subject) claim from our custom JWT access token.
     """
     try:
-        user_id = event.get("requestContext", {}).get("authorizer", {}).get("jwt", {}).get("claims", {}).get("email")
+        # The authorizer now provides the decoded JWT payload directly
+        user_id = event.get("requestContext", {}).get("authorizer", {}).get("jwt", {}).get("claims", {}).get("sub")
         if user_id:
             return UserId(str(user_id))
-        user_id = event.get("requestContext", {}).get("authorizer", {}).get("principalId")
-        if user_id:
-            return UserId(str(user_id))
-        _LOGGER.warning("User ID not found in authorizer context.")
+
+        # Fallback for old structure or different authorizer types if needed
+        user_id_from_principal = event.get("requestContext", {}).get("authorizer", {}).get("principalId")
+        if user_id_from_principal:
+            return UserId(str(user_id_from_principal))
+
+        _LOGGER.warning("User ID not found in authorizer claims or principalId.")
         return None
     except Exception as e:
         _LOGGER.error("Error extracting user_id from event: %s", str(e))

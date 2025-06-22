@@ -6,10 +6,7 @@ from aws_src_sample.lambdas.learning_entries_lambda import LearningEntriesApiHan
 from aws_src_sample.models.learning_entry_models import ReflectionVersionItemModel
 from aws_src_sample.utils.chatbot_utils import ChatBotFeedback
 
-
-def add_authorizer_info(event: dict, user_id: str) -> None:
-    assert "authorizer" not in event["requestContext"]
-    event["requestContext"]["authorizer"] = {"jwt": {"claims": {"email": user_id}}}
+from ..test_utils.authorizer import add_authorizer_info
 
 
 def test_learning_entries_api_handler_1():
@@ -143,10 +140,7 @@ def test_learning_entries_api_handler_handle_get_reflection_3():
             "apiId": "123456",
             "authorizer": {
                 "jwt": {
-                    "claims": {
-                        "email": "erizzi@ucls.uchicago.edu",
-                        "email_verified": "true",
-                    },
+                    "claims": {"email": "erizzi@ucls.uchicago.edu", "email_verified": "true", "sub": "1234"},
                     "scopes": None,
                 }
             },

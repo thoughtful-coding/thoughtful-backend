@@ -4,12 +4,8 @@ from unittest.mock import MagicMock, Mock
 
 from aws_src_sample.lambdas.primm_feedback_lambda import PrimmFeedbackApiHandler
 from aws_src_sample.models.primm_feedback_models import PrimmEvaluationResponseModel
-from aws_src_sample.utils.chatbot_utils import ChatBotFeedback
 
-
-def add_authorizer_info(event: dict, user_id: str) -> None:
-    assert "authorizer" not in event["requestContext"]
-    event["requestContext"]["authorizer"] = {"jwt": {"claims": {"email": user_id}}}
+from ..test_utils.authorizer import add_authorizer_info
 
 
 def test_primm_feedbackg_api_handler_1():
