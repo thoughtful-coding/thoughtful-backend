@@ -58,7 +58,6 @@ def test_authorizer_lambda_handler_1() -> None:
     }
 
     authorizer_lambda = create_authorizer_lambda(secrets_repo=mock_secret_repo)
-    breakpoint()
     result = authorizer_lambda.handle(event)
     assert result["principalId"] == "12345_google_user_sub"
     assert result["policyDocument"]["Statement"][0]["Action"] == "execute-api:Invoke"
