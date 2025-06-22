@@ -139,8 +139,10 @@ def test_learning_entries_api_handler_handle_get_reflection_3():
             "accountId": "abc1234",
             "apiId": "123456",
             "authorizer": {
-                "jwt": {
-                    "claims": {"email": "erizzi@ucls.uchicago.edu", "email_verified": "true", "sub": "1234"},
+                "lambda": {
+                    "email": "erizzi@ucls.uchicago.edu",
+                    "email_verified": "true",
+                    "sub": "1234",
                     "scopes": None,
                 }
             },

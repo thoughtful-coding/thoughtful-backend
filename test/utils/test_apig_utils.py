@@ -32,9 +32,7 @@ def test_get_method_2() -> None:
 def test_get_user_id_from_event_1() -> None:
     event = {
         "requestContext": {
-            "authorizer": {
-                "jwt": {"claims": {"email": "erizzi@ucls.uchicago.edu", "email_verified": "true", "sub": "1234"}}
-            }
+            "authorizer": {"lambda": {"email": "erizzi@ucls.uchicago.edu", "email_verified": "true", "sub": "1234"}}
         }
     }
 
