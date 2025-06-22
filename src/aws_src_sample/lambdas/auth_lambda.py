@@ -12,7 +12,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_google_client_id,
     get_refresh_token_table_name,
 )
-from aws_src_sample.utils.base_types import UserId
+from aws_src_sample.utils.base_types import RefreshTokenId, UserId
 from aws_src_sample.utils.jwt_utils import JwtWrapper
 
 _LOGGER = logging.getLogger(__name__)
@@ -44,7 +44,9 @@ class AuthApiHandler:
                 _LOGGER.error("Google token audience mismatch.")
                 return None
 
-            # Additional checks like issuer (iss) can be added here
+            if token_info.get("email_verified") != True:
+                _LOGGER.error(f"Google email '{token_info.get('email')}' is not verified.")
+                return None
 
             return token_info
         except requests.RequestException as e:
@@ -56,11 +58,10 @@ class AuthApiHandler:
             body = LoginRequest.model_validate_json(event.get("body", "{}"))
             google_token_info = self._verify_google_token(body.google_id_token)
 
-            if not google_token_info or "sub" not in google_token_info:
-                return format_lambda_response(401, {"message": "Invalid Google token"})
+            if not google_token_info or "email" not in google_token_info:
+                return format_lambda_response(401, {"message": "Invalid Google token or missing email."})
 
-            user_id = UserId(google_token_info["sub"])
-
+            user_id = UserId(google_token_info["email"])
             access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_repo)
             refresh_token, token_id, ttl = self.jwt_wrapper.create_refresh_token(user_id, self.secrets_repo)
 
@@ -86,7 +87,7 @@ class AuthApiHandler:
                 return format_lambda_response(401, {"message": "Invalid refresh token"})
 
             user_id = UserId(payload["sub"])
-            token_id = payload["jti"]
+            token_id = RefreshTokenId(payload["jti"])
 
             if not self.token_table.get_token(user_id, token_id):
                 return format_lambda_response(401, {"message": "Refresh token not found or expired"})
@@ -114,13 +115,12 @@ class AuthApiHandler:
 
             if payload and "sub" in payload and "jti" in payload:
                 user_id = UserId(payload["sub"])
-                token_id = payload["jti"]
+                token_id = RefreshTokenId(payload["jti"])
                 self.token_table.delete_token(user_id, token_id)
 
             return format_lambda_response(200, {"message": "Successfully logged out"})
 
         except Exception as e:
-            # We don't want to return an error if logout fails, just log it and succeed.
             _LOGGER.error(f"Logout error: {e}", exc_info=True)
             return format_lambda_response(200, {"message": "Logout completed"})
 

@@ -53,6 +53,7 @@ def test_handle_login_success():
             "aud": MOCK_GOOGLE_CLIENT_ID,
             "sub": MOCK_USER_ID,
             "email": "test@example.com",
+            "email_verified": True,
         }
         mock_requests_get.return_value = mock_response
 
