@@ -61,9 +61,7 @@ class PrimmFeedbackApiHandler:
 
         except ValidationError as e:
             _LOGGER.error(f"PRIMM feedback request body validation error: {e.errors()}", exc_info=True)
-            return format_lambda_response(
-                400, {"message": "Invalid request body for PRIMM feedback.", "details": e.errors()}
-            )
+            return format_lambda_response(400, {"message": "Invalid request body for PRIMM feedback."})
         except json.JSONDecodeError:
             _LOGGER.error("PRIMM feedback request body is not valid JSON.", exc_info=True)
             return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
@@ -108,21 +106,19 @@ class PrimmFeedbackApiHandler:
                 return self._handle_post_request(event, user_id)
             else:
                 _LOGGER.warning(f"Unsupported HTTP method for /primm-feedback: {http_method}")
-                return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed on this path."})
+                return format_lambda_response(405, {"message": f"HTTP method not allowed on this path."})
 
         except ThrottleRateLimitExceededException as te:
             _LOGGER.warning(f"Throttling limit hit for PRIMM feedback (user {user_id}): {te.limit_type} - {te.message}")
             # The message from ThrottlingRateLimitExceededException is already user-friendly
-            return format_lambda_response(429, {"message": te.message, "type": te.limit_type})
+            return format_lambda_response(429, {"message": "Throttling limit hit for PRIMM feedback."})
         except (ConnectionError, TimeoutError) as ce:  # Errors from ChatBotWrapper's _call_google_generative_api
             _LOGGER.error(f"AI Service communication error during PRIMM feedback: {str(ce)}", exc_info=True)
             status_code = 504 if isinstance(ce, TimeoutError) else 503
-            return format_lambda_response(
-                status_code, {"message": f"AI evaluation service communication error: {str(ce)}"}
-            )
+            return format_lambda_response(status_code, {"message": "AI evaluation service communication error."})
         except ValueError as ve:  # Catch Pydantic validation errors from ChatBot response or other ValueErrors
             _LOGGER.error(f"ValueError during PRIMM feedback processing: {str(ve)}", exc_info=True)
-            return format_lambda_response(400, {"message": f"Invalid data processing for PRIMM feedback: {str(ve)}"})
+            return format_lambda_response(400, {"message": "Invalid data processing for PRIMM feedback."})
         except Exception as e:
             _LOGGER.error(f"Unexpected error in PrimmFeedbackApiHandler: {str(e)}", exc_info=True)
             return format_lambda_response(
@@ -151,4 +147,4 @@ def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
 
     except Exception as e:
         _LOGGER.critical(f"Critical error in global handler setup: {str(e)}", exc_info=True)
-        return format_lambda_response(500, {"message": f"Internal server error during handler setup."})
+        return format_lambda_response(500, {"message": "Internal server error during handler setup."})

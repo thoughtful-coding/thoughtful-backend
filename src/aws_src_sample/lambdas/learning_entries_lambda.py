@@ -232,7 +232,7 @@ class LearningEntriesApiHandler:
                 interaction_input = ReflectionInteractionInputModel.model_validate_json(raw_body)
             except ValidationError as e:
                 _LOGGER.error(f"Request body validation error: {e.errors()}", exc_info=True)
-                return format_lambda_response(400, {"message": "Invalid request body.", "details": e.errors()})
+                return format_lambda_response(400, {"message": "Invalid request body."})
             except json.JSONDecodeError:
                 _LOGGER.error("Request body is not valid JSON.", exc_info=True)
                 return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
@@ -269,25 +269,25 @@ class LearningEntriesApiHandler:
                 return self._route_post_request(event, user_id)
             else:
                 _LOGGER.warning("Unsupported HTTP method for /learning-entries: %s", http_method)
-                return format_lambda_response(405, {"message": f"HTTP method {http_method} not allowed on /progress."})
+                return format_lambda_response(405, {"message": f"HTTP method not allowed on /progress."})
 
         except ValidationError as ve:
             _LOGGER.error(f"Pydantic ValidationError in handler: {str(ve)}", exc_info=True)
-            return format_lambda_response(400, {"message": "Invalid data.", "details": ve.errors()})
+            return format_lambda_response(400, {"message": "Invalid data."})
         except ValueError as ve:
             _LOGGER.warning(f"ValueError in handler: {str(ve)}", exc_info=False)
-            return format_lambda_response(400, {"message": str(ve)})
+            return format_lambda_response(400, {"message": "ValueError handling incoming data."})
         except (ConnectionError, TimeoutError) as ce:  # AI service issues
             _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
             status_code = 504 if isinstance(ce, TimeoutError) else 503
-            return format_lambda_response(status_code, {"message": f"AI service communication error: {str(ce)}"})
+            return format_lambda_response(status_code, {"message": "AI service communication error."})
         except ClientError as e:
             _LOGGER.error(f"DynamoDB ClientError in handler: {e.response['Error']['Message']}", exc_info=True)
-            return format_lambda_response(500, {"message": f"Database error."})
+            return format_lambda_response(500, {"message": "Database error."})
         except ThrottleRateLimitExceededException as te:
             _LOGGER.warning(f"Throttling: {te.limit_type} for user {user_id} - {te.message}")
             # Use the message from the exception, which is already user-friendly
-            return format_lambda_response(429, {"message": te.message, "type": te.limit_type})
+            return format_lambda_response(429, {"message": "Throttling limit hit for Reflection feedback"})
 
         except Exception as e:
             _LOGGER.error(f"Unexpected error in API handler: {str(e)}", exc_info=True)
