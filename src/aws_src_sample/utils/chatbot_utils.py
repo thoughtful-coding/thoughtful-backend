@@ -14,10 +14,60 @@ _LOGGER.setLevel(logging.INFO)
 CHATBOT_MODEL = "gemini-2.0-flash"
 
 
+_PREDFINED_CODE_REFLECTION_FEEDBACK_PROMPT_TEMPLATE = """
+You are an expert in programming and tutoring. Your task is to evaluate a student's
+explanation of a given piece of Python code that illustrates how a particular topic
+works. Provide short, concise, and constructive feedback and an assessment level on
+their analysis of the given piece of code. Be mindful that these students are
+learning and don't provide feedback that is beyond the level of the given example.
+
+### Student's Submission Details
+
+**Topic of Student's Analysis:** {topic}
+
+**Code Student Was Given to Analyze:**
+
+```python
+{code}
+```
+
+**Student's Explanation:**
+
+{explanation}
+
+### Rubric for Assessment Levels
+
+| Objective | Requirements/Specifications | Achieves | Mostly | Developing | Insufficient |
+| :---- | :---- | :---- | :---- | :---- | :---- |
+| Well-written: Entry is well-written and displays level of care expected in other, writing-centered classes | Entry is brief and to the point: it is no longer than it has to be. Entry uses proper terminology. Entry has no obvious spelling mistakes Entry uses proper grammar  | Entry is of high quality without any obvious errors or extraneous information | Entry contains one or two errors and could only be shortened a little | Entry contains many errors and has a lot of unnecessary, repetitive information. |  |
+| Thoughtful: Entry includes analysis that is easy to understand and could prove useful in the future | Analysis is about a topic that could conceivably come up in a future CS class. Analysis identifies single possible point of confusion. Analysis eliminates all possible confusion on the topic. Analysis references example. The phrase “as seen in the example” present in entry. | All requirements met. | Entry contains all but one of the requirements. | Entry's analysis is superficial an unfocused. |  |
+
+### Instructions
+
+Please provide your evaluation in a strict JSON format with the following structure and keys (use camelCase for keys).
+For example:
+
+```
+{{
+    "aiFeedback": "Your code is clear and accurately demonstrates the concept. Consider adding comments for better readability",
+    "aiAssessment": "mostly",
+}}
+```
+
+Valid `aiAssessment` values are: "achieves", "mostly", "developing", "insufficient".
+
+IMPORTANT: Respond ONLY with the valid JSON object as described. Do not include
+any other text, greetings, or conversational filler before or after the JSON.
+"""
+
+
 _REFLECTION_FEEDBACK_PROMPT_TEMPLATE = """
-You are an automated Python code assessor. Your task is to evaluate a student's Python code example
-and explanation based on a specified topic. Provide short and concise constructive feedback and an
-assessment level.
+You are an expert in programming and tutoring. Your task is to evaluate a student's self-created
+Python code example and their explanation for a chosen topic.
+
+Provide short, concise, and constructive feedback. Your feedback should assess both the correctness
+of the code and the clarity of the explanation. Be mindful that these are students, so your feedback
+should not go too far beyond the scope of the topic they are trying to explain.
 
 ### Student's Submission Details
 
@@ -44,14 +94,7 @@ assessment level.
 ### Instructions
 
 Please provide your evaluation in a strict JSON format with the following structure and keys (use camelCase for keys).
-```
-{{
-    "aiFeedback": "mostly",
-    "aiFeedback": "AssessmentLevel: string",
-}}
-```
-
-Make sure your feedback is concise and throughtful. For example:
+For example:
 
 ```
 {{
@@ -60,7 +103,7 @@ Make sure your feedback is concise and throughtful. For example:
 }}
 ```
 
-Valid AssessmentLevel values are: "achieves", "mostly", "developing", "insufficient".
+Valid `aiAssessment` values are: "achieves", "mostly", "developing", "insufficient".
 
 IMPORTANT: Respond ONLY with the valid JSON object as described. Do not include
 any other text, greetings, or conversational filler before or after the JSON.
@@ -142,7 +185,7 @@ Please provide your evaluation in a strict JSON format with the following struct
 }}
 ```
 
-Valid AssessmentLevel values are: "achieves", "mostly", "developing", "insufficient".
+Valid `AssessmentLevel` values are: "achieves", "mostly", "developing", "insufficient".
 
 IMPORTANT: Respond ONLY with the valid JSON object as described. Do not include any other text,
 greetings, or conversational filler before or after the JSON.
@@ -215,11 +258,39 @@ class ChatBotWrapper:
             _LOGGER.error(f"Error processing AI response: {e}. Raw Response: {response}")
             raise ValueError(f"Invalid or unexpected response from AI service: {str(e)}")
 
-    def generate_reflection_feedback_prompt(self, *, topic: str, code: str, explanation: str) -> str:
-        return _REFLECTION_FEEDBACK_PROMPT_TEMPLATE.format(topic=topic, code=code, explanation=explanation)
+    def generate_reflection_feedback_prompt(
+        self,
+        *,
+        topic: str,
+        is_topic_predefined: bool,
+        code: str,
+        is_code_predefined: bool,
+        explanation: str,
+    ) -> str:
+        if is_code_predefined:
+            return _PREDFINED_CODE_REFLECTION_FEEDBACK_PROMPT_TEMPLATE.format(
+                topic=topic, code=code, explanation=explanation
+            )
+        else:
+            return _REFLECTION_FEEDBACK_PROMPT_TEMPLATE.format(topic=topic, code=code, explanation=explanation)
 
-    def call_reflection_api(self, *, chatbot_api_key: str, topic: str, code: str, explanation: str) -> ChatBotFeedback:
-        prompt = self.generate_reflection_feedback_prompt(topic=topic, code=code, explanation=explanation)
+    def call_reflection_api(
+        self,
+        *,
+        chatbot_api_key: str,
+        topic: str,
+        is_topic_predefined: bool,
+        code: str,
+        is_code_predefined: bool,
+        explanation: str,
+    ) -> ChatBotFeedback:
+        prompt = self.generate_reflection_feedback_prompt(
+            topic=topic,
+            is_topic_predefined=is_topic_predefined,
+            code=code,
+            is_code_predefined=is_code_predefined,
+            explanation=explanation,
+        )
         generated_dict = self._call_google_generative_api(
             chatbot_api_key=chatbot_api_key,
             prompt=prompt,

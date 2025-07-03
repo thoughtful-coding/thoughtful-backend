@@ -283,7 +283,9 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
     """
     reflection = {
         "userTopic": "Things to think",
+        "isUserTopicPredefined": "False",
         "userCode": "for i in range",
+        "isUserCodePredefined": "False",
         "userExplanation": "goes around",
     }
     event = {

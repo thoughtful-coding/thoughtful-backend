@@ -20,8 +20,10 @@ class ReflectionInteractionInputModel(pydantic.BaseModel):
     """
 
     userTopic: str
+    isUserTopicPredefined: bool
     userCode: str
-    userExplanation: str  # Name from your latest Swagger
+    isUserCodePredefined: bool
+    userExplanation: str
     isFinal: bool = False
     sourceVersionId: typing.Optional[str] = None
 

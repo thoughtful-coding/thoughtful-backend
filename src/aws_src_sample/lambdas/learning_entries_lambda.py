@@ -70,7 +70,9 @@ class LearningEntriesApiHandler:
             ai_response = self.chatbot_wrapper.call_reflection_api(
                 chatbot_api_key=self.secrets_repo.get_chatbot_api_key(),
                 topic=interaction_input.userTopic,
+                is_topic_predefined=interaction_input.isUserTopicPredefined,
                 code=interaction_input.userCode,
+                is_code_predefined=interaction_input.isUserCodePredefined,
                 explanation=interaction_input.userExplanation,
             )
 

@@ -10,11 +10,41 @@ def test_chatbot_wrapper_init() -> None:
     ChatBotWrapper()
 
 
-def test_chatbot_wrapper_gen_reflection_feedback_prompt() -> None:
+def test_chatbot_wrapper_gen_reflection_feedback_prompt_1() -> None:
+    """
+    Test prompt where student writes their own code
+    """
+
     cbw = ChatBotWrapper()
-    prompt = cbw.generate_reflection_feedback_prompt(topic="For Loops", code="for i in range", explanation="Around")
+    prompt = cbw.generate_reflection_feedback_prompt(
+        topic="For Loops",
+        is_topic_predefined=False,
+        code="for i in range",
+        is_code_predefined=False,
+        explanation="Around",
+    )
 
     assert "**Topic:** For Loops" in prompt
+    assert "```python\nfor i in range\n```" in prompt
+    assert "**Student's Explanation:**\n\nAround\n" in prompt
+
+
+def test_chatbot_wrapper_gen_reflection_feedback_prompt_2() -> None:
+    """
+    Test prompt where student is given predefined code they have to explain
+    """
+
+    cbw = ChatBotWrapper()
+    prompt = cbw.generate_reflection_feedback_prompt(
+        topic="For Loops",
+        is_topic_predefined=False,
+        code="for i in range",
+        is_code_predefined=True,
+        explanation="Around",
+    )
+
+    assert "**Topic of Student's Analysis:** For Loops" in prompt
+    assert "**Code Student Was Given to Analyze:**" in prompt
     assert "```python\nfor i in range\n```" in prompt
     assert "**Student's Explanation:**\n\nAround\n" in prompt
 
@@ -45,7 +75,12 @@ def test_call_reflection_feedback_api_normal_behavior(mock_post):
 
     # Expected prompt that will be generated
     feedback = cbw.call_reflection_api(
-        chatbot_api_key="key", topic="For loops", code="for i in range(i):", explanation="Around"
+        chatbot_api_key="key",
+        topic="For loops",
+        is_topic_predefined=False,
+        code="for i in range(i):",
+        is_code_predefined=False,
+        explanation="Around",
     )
 
     assert feedback.aiAssessment == "achieves"
@@ -73,7 +108,14 @@ def test_call_reflection_feedback_api_abnormal_behavior(mock_post):
     cbw = ChatBotWrapper()
 
     # Expected prompt that will be generated
-    cbw.call_reflection_api(chatbot_api_key="key", topic="For loops", code="for i in range(i):", explanation="Around")
+    cbw.call_reflection_api(
+        chatbot_api_key="key",
+        topic="For loops",
+        is_topic_predefined=False,
+        code="for i in range(i):",
+        is_code_predefined=False,
+        explanation="Around",
+    )
 
 
 def test_chatbot_wrapper_gen_primm_feedback_prompt() -> None:
