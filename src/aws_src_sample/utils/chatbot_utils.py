@@ -14,6 +14,12 @@ _LOGGER.setLevel(logging.INFO)
 CHATBOT_MODEL = "gemini-2.0-flash"
 
 
+class ChatBotApiError(Exception):
+    def __init__(self, msg: str, status_code: int = 503) -> None:
+        super().__init__(msg)
+        self.status_code = status_code
+
+
 _PREDFINED_CODE_REFLECTION_FEEDBACK_PROMPT_TEMPLATE = """
 You are an expert in programming and tutoring. Your task is to evaluate a student's
 explanation of a given piece of Python code that illustrates how a particular topic
@@ -221,12 +227,12 @@ class ChatBotWrapper:
             candidates = api_response_data.get("candidates")
             if not isinstance(candidates, list) or len(candidates) == 0 or not candidates[0].get("content"):
                 _LOGGER.error("Invalid or missing candidates/content in GenAI API response: %s", api_response_data)
-                raise ValueError("AI service returned an unexpected response structure (no candidates/content).")
+                raise ChatBotApiError("AI service returned an unexpected response structure (no candidates/content).")
 
             parts = candidates[0]["content"].get("parts")
             if not isinstance(parts, list) or len(parts) == 0 or not parts[0].get("text"):
                 _LOGGER.error("Invalid or missing parts/text in GenAI API response: %s", api_response_data)
-                raise ValueError("AI service returned an unexpected response structure (no parts/text).")
+                raise ChatBotApiError("AI service returned an unexpected response structure (no parts/text).")
 
             generated_text = str(parts[0]["text"])
             _LOGGER.info(f"Raw GenAI response text (first 500 chars): {generated_text[:500]}")
@@ -241,22 +247,22 @@ class ChatBotWrapper:
                     return json.loads(generated_text)
             except json.JSONDecodeError as json_e:
                 _LOGGER.error(f"Failed to parse. Error: {json_e}. Text: {generated_text}", exc_info=True)
-                raise ValueError(f"AI returned non-JSON response. Content: {generated_text[:500]}")
+                raise ChatBotApiError(f"AI returned non-JSON response. Content: {generated_text[:500]}")
 
         except requests.exceptions.Timeout:
             _LOGGER.error("Google GenAI API request timed out.")
-            raise TimeoutError("AI service request timed out.")
+            raise ChatBotApiError("AI service request timed out.", 504)
         except requests.exceptions.RequestException as e:
             _LOGGER.error(f"Google GenAI API request failed: {e}")
             if e.response is not None:
                 _LOGGER.error(f"GenAI API Error Response: {e.response.text}")
-            raise ConnectionError(f"Failed to communicate with AI service: {str(e)}")
+            raise ChatBotApiError(f"Failed to communicate with AI service: {str(e)}")
         except ValueError as e:
             _LOGGER.error(f"ValueError during AI call or response processing: {e}", exc_info=True)
-            raise
+            raise ChatBotApiError(f"ValueError during AI call or response processing: {str(e)}")
         except (KeyError, IndexError, json.JSONDecodeError, ValueError) as e:
             _LOGGER.error(f"Error processing AI response: {e}. Raw Response: {response}")
-            raise ValueError(f"Invalid or unexpected response from AI service: {str(e)}")
+            raise ChatBotApiError(f"Invalid or unexpected response from AI service: {str(e)}")
 
     def generate_reflection_feedback_prompt(
         self,

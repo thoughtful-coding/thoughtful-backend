@@ -9,16 +9,31 @@ from aws_src_sample.utils.chatbot_utils import ChatBotFeedback
 from ..test_utils.authorizer import add_authorizer_info
 
 
+def create_learning_entries_api_handler(
+    learning_entries_table=Mock(),
+    throttle_table=Mock(),
+    secrets_repo=Mock(),
+    chatbot_wrapper=Mock(),
+    metrics_manager=Mock(),
+) -> LearningEntriesApiHandler:
+    authorizer_handler = LearningEntriesApiHandler(
+        learning_entries_table,
+        throttle_table,
+        secrets_repo,
+        chatbot_wrapper,
+        metrics_manager=metrics_manager,
+    )
+    assert authorizer_handler.learning_entries_table == learning_entries_table
+    assert authorizer_handler.throttle_table == throttle_table
+    assert authorizer_handler.secrets_repo == secrets_repo
+    assert authorizer_handler.chatbot_wrapper == chatbot_wrapper
+    assert authorizer_handler.metrics_manager == metrics_manager
+
+    return authorizer_handler
+
+
 def test_learning_entries_api_handler_1():
-    learning_entries_table = Mock()
-    throttle_table = Mock()
-    secrets_repo = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_repo, chatbot_wrapper)
-    assert ret.learning_entries_table == learning_entries_table
-    assert ret.throttle_table == throttle_table
-    assert ret.secrets_repo == secrets_repo
-    assert ret.chatbot_wrapper == chatbot_wrapper
+    create_learning_entries_api_handler()
 
 
 def test_learning_entries_api_handler_handle_error_1():
@@ -27,12 +42,8 @@ def test_learning_entries_api_handler_handle_error_1():
     """
     event = {}
 
-    learning_entries_table = Mock()
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler()
+    response = leah.handle(event)
 
     assert response["statusCode"] == 401
 
@@ -44,12 +55,8 @@ def test_learning_entries_api_handler_handle_error_2():
     event = {"requestContext": {}}
     add_authorizer_info(event, "e")
 
-    learning_entries_table = Mock()
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler()
+    response = leah.handle(event)
 
     assert response["statusCode"] == 405
 
@@ -68,11 +75,8 @@ def test_learning_entries_api_handler_handle_get_reflections_1():
 
     learning_entries_table = Mock()
     learning_entries_table.get_versions_for_section.return_value = ([], None)
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler(learning_entries_table=learning_entries_table)
+    response = leah.handle(event)
 
     assert response["statusCode"] == 200
     body_list = json.loads(response["body"])
@@ -94,11 +98,8 @@ def test_learning_entries_api_handler_handle_get_reflection_2():
 
     learning_entries_table = Mock()
     learning_entries_table.get_versions_for_section.return_value = ([], None)
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler(learning_entries_table=learning_entries_table)
+    response = leah.handle(event)
 
     assert response["statusCode"] == 200
     body_list = json.loads(response["body"])
@@ -167,11 +168,8 @@ def test_learning_entries_api_handler_handle_get_reflection_3():
 
     learning_entries_table = Mock()
     learning_entries_table.get_versions_for_section.return_value = ([], None)
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler(learning_entries_table=learning_entries_table)
+    response = leah.handle(event)
 
     assert response["statusCode"] == 200
     body_list = json.loads(response["body"])
@@ -191,11 +189,8 @@ def test_learning_entries_api_handler_handle_get_finalized_1():
 
     learning_entries_table = Mock()
     learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler(learning_entries_table=learning_entries_table)
+    response = leah.handle(event)
 
     assert response["statusCode"] == 200
     body_list = json.loads(response["body"])
@@ -215,11 +210,8 @@ def test_learning_entries_api_handler_handle_get_finalized_2():
 
     learning_entries_table = Mock()
     learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler(learning_entries_table=learning_entries_table)
+    response = leah.handle(event)
 
     assert response["statusCode"] == 200
     body_list = json.loads(response["body"])
@@ -241,12 +233,8 @@ def test_learning_entries_api_handler_handle_post_reflection_1():
     }
     add_authorizer_info(event, "e")
 
-    learning_entries_table = Mock()
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler()
+    response = leah.handle(event)
 
     assert response["statusCode"] == 400
 
@@ -267,12 +255,8 @@ def test_learning_entries_api_handler_handle_post_reflection_2():
     }
     add_authorizer_info(event, "e")
 
-    learning_entries_table = Mock()
-    throttle_table = Mock()
-    secrets_manager = Mock()
-    chatbot_wrapper = Mock()
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+    leah = create_learning_entries_api_handler()
+    response = leah.handle(event)
 
     assert response["statusCode"] == 400
 
@@ -323,8 +307,13 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
     secrets_manager = Mock()
     chatbot_wrapper = Mock()
     chatbot_wrapper.call_reflection_api.return_value = ChatBotFeedback("looks good", "mostly")
-    ret = LearningEntriesApiHandler(learning_entries_table, throttle_table, secrets_manager, chatbot_wrapper)
-    response = ret.handle(event)
+
+    leah = create_learning_entries_api_handler(
+        learning_entries_table=learning_entries_table,
+        throttle_table=throttle_table,
+        chatbot_wrapper=chatbot_wrapper,
+    )
+    response = leah.handle(event)
 
     assert response["statusCode"] == 201
     body_dict = json.loads(response["body"])

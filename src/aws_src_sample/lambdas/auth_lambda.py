@@ -4,6 +4,7 @@ import typing
 import requests
 from pydantic import ValidationError
 
+from aws_src_sample.cloudwatch.metrics import MetricsManager
 from aws_src_sample.dynamodb.refresh_token_table import RefreshTokenTable
 from aws_src_sample.models.auth_models import LoginRequest, RefreshRequest, TokenPayload
 from aws_src_sample.secrets_manager.secrets_repository import SecretsRepository
@@ -28,11 +29,13 @@ class AuthApiHandler:
         secrets_repo: SecretsRepository,
         google_client_id: str,
         jwt_wrapper: JwtWrapper,
+        metrics_manager: MetricsManager,
     ):
         self.token_table = token_table
         self.secrets_repo = secrets_repo
         self.google_client_id = google_client_id
         self.jwt_wrapper = jwt_wrapper
+        self.metrics_manager = metrics_manager
 
     def _verify_google_token(self, token: str) -> typing.Optional[dict]:
         try:
@@ -58,6 +61,7 @@ class AuthApiHandler:
             google_token_info = self._verify_google_token(body.google_id_token)
 
             if not google_token_info or "email" not in google_token_info:
+                self.metrics_manager.put_metric("LoginFailure", 1)
                 return format_lambda_response(401, {"message": "Invalid Google token or missing email."})
 
             user_id = UserId(google_token_info["email"])
@@ -65,16 +69,22 @@ class AuthApiHandler:
             refresh_token, token_id, ttl = self.jwt_wrapper.create_refresh_token(user_id, self.secrets_repo)
 
             if not self.token_table.save_token(user_id, token_id, ttl):
+                self.metrics_manager.put_metric("LoginFailure", 1)
                 return format_lambda_response(500, {"message": "Could not save session"})
 
+            self.metrics_manager.put_metric("LoginSuccess", 1)
+            self.metrics_manager.put_metric("RefreshTokenSaved", 1)
             return format_lambda_response(
                 200, TokenPayload(accessToken=access_token, refreshToken=refresh_token).model_dump(by_alias=True)
             )
 
         except ValidationError as e:
+            _LOGGER.error(f"Validation error: {e}", exc_info=True)
+            self.metrics_manager.put_metric("LoginFailure", 1)
             return format_lambda_response(400, {"message": "Invalid request body", "details": e.errors()})
         except Exception as e:
             _LOGGER.error(f"Login error: {e}", exc_info=True)
+            self.metrics_manager.put_metric("LoginFailure", 1)
             return format_lambda_response(500, {"message": "An internal error occurred during login."})
 
     def _handle_refresh(self, event: dict) -> dict:
@@ -83,15 +93,18 @@ class AuthApiHandler:
             payload = self.jwt_wrapper.verify_token(body.refresh_token, self.secrets_repo)
 
             if not payload or "sub" not in payload or "jti" not in payload:
+                self.metrics_manager.put_metric("RefreshFailure", 1)
                 return format_lambda_response(401, {"message": "Invalid refresh token"})
 
             user_id = UserId(payload["sub"])
             token_id = RefreshTokenId(payload["jti"])
 
             if not self.token_table.get_token(user_id, token_id):
+                self.metrics_manager.put_metric("RefreshFailure", 1)
                 return format_lambda_response(401, {"message": "Refresh token not found or expired"})
 
             new_access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_repo)
+            self.metrics_manager.put_metric("RefreshSuccess", 1)
 
             # Note: For enhanced security, you could implement refresh token rotation here
             # by deleting the old token and issuing a new one.
@@ -102,9 +115,12 @@ class AuthApiHandler:
             )
 
         except ValidationError as e:
+            _LOGGER.error(f"Validation error: {e}", exc_info=True)
+            self.metrics_manager.put_metric("RefreshFailure", 1)
             return format_lambda_response(400, {"message": "Invalid request body", "details": e.errors()})
         except Exception as e:
             _LOGGER.error(f"Refresh error: {e}", exc_info=True)
+            self.metrics_manager.put_metric("RefreshFailure", 1)
             return format_lambda_response(500, {"message": "An internal error occurred during token refresh."})
 
     def _handle_logout(self, event: dict) -> dict:
@@ -140,14 +156,19 @@ class AuthApiHandler:
 
 def auth_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info("Auth lambda handler invoked.")
+    metrics_manager = MetricsManager("ThoughtfulPython/Authentication")
+
     try:
         handler = AuthApiHandler(
             token_table=RefreshTokenTable(get_refresh_token_table_name()),
             secrets_repo=SecretsRepository(),
             google_client_id=get_google_client_id(),
             jwt_wrapper=JwtWrapper(),
+            metrics_manager=metrics_manager,
         )
         return handler.handle(event)
     except Exception as e:
         _LOGGER.critical(f"Critical error in auth_lambda_handler: {e}", exc_info=True)
         return format_lambda_response(500, {"message": "Internal Server Error in Auth Handler"})
+    finally:
+        metrics_manager.flush()

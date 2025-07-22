@@ -11,13 +11,16 @@ MOCK_USER_ID = UserId("12345_google_user_sub")
 def create_authorizer_lambda(
     secrets_repo=Mock(),
     jwt_wrapper=JwtWrapper(),
+    metrics_manager=Mock(),
 ) -> AuthorizerLambda:
     authorizer_handler = AuthorizerLambda(
         secrets_repo=secrets_repo,
         jwt_wrapper=jwt_wrapper,
+        metrics_manager=metrics_manager,
     )
     assert authorizer_handler.secrets_repo == secrets_repo
     assert authorizer_handler.jwt_wrapper == jwt_wrapper
+    assert authorizer_handler.metrics_manager == metrics_manager
     return authorizer_handler
 
 

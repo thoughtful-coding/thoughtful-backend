@@ -16,15 +16,21 @@ def create_auth_api_handler(
     secrets_repo=Mock(),
     google_client_id=MOCK_GOOGLE_CLIENT_ID,
     jwt_wrapper=JwtWrapper(),
+    metrics_manager=Mock(),
 ) -> AuthApiHandler:
     """Creates an instance of the handler with mocked dependencies."""
     auth_handler = AuthApiHandler(
-        token_table=token_table, secrets_repo=secrets_repo, google_client_id=google_client_id, jwt_wrapper=jwt_wrapper
+        token_table=token_table,
+        secrets_repo=secrets_repo,
+        google_client_id=google_client_id,
+        jwt_wrapper=jwt_wrapper,
+        metrics_manager=metrics_manager,
     )
     assert auth_handler.token_table == token_table
     assert auth_handler.secrets_repo == secrets_repo
     assert auth_handler.google_client_id == google_client_id
     assert auth_handler.jwt_wrapper == jwt_wrapper
+    assert auth_handler.metrics_manager == metrics_manager
     return auth_handler
 
 

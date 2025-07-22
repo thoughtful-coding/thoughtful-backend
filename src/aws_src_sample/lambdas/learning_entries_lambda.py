@@ -3,9 +3,9 @@ import json
 import logging
 import typing
 
-from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
+from aws_src_sample.cloudwatch.metrics import MetricsManager
 from aws_src_sample.dynamodb.learning_entries_table import LearningEntriesTable
 from aws_src_sample.dynamodb.throttle_table import (
     ThrottleRateLimitExceededException,
@@ -34,7 +34,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_throttle_table_name,
 )
 from aws_src_sample.utils.base_types import LessonId, SectionId, UserId
-from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
+from aws_src_sample.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -47,11 +47,13 @@ class LearningEntriesApiHandler:
         throttle_table: ThrottleTable,
         secrets_repo: SecretsRepository,
         chatbot_wrapper: ChatBotWrapper,
+        metrics_manager: MetricsManager,
     ):
         self.learning_entries_table = learning_entries_table
         self.throttle_table = throttle_table
         self.secrets_repo = secrets_repo
         self.chatbot_wrapper = chatbot_wrapper
+        self.metrics_manager = metrics_manager
 
     def _process_draft_submission(
         self,
@@ -273,24 +275,17 @@ class LearningEntriesApiHandler:
                 _LOGGER.warning("Unsupported HTTP method for /learning-entries: %s", http_method)
                 return format_lambda_response(405, {"message": f"HTTP method not allowed on /progress."})
 
-        except ValidationError as ve:
-            _LOGGER.error(f"Pydantic ValidationError in handler: {str(ve)}", exc_info=True)
-            return format_lambda_response(400, {"message": "Invalid data."})
         except ValueError as ve:
             _LOGGER.warning(f"ValueError in handler: {str(ve)}", exc_info=False)
             return format_lambda_response(400, {"message": "ValueError handling incoming data."})
-        except (ConnectionError, TimeoutError) as ce:  # AI service issues
-            _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
-            status_code = 504 if isinstance(ce, TimeoutError) else 503
-            return format_lambda_response(status_code, {"message": "AI service communication error."})
-        except ClientError as e:
-            _LOGGER.error(f"DynamoDB ClientError in handler: {e.response['Error']['Message']}", exc_info=True)
-            return format_lambda_response(500, {"message": "Database error."})
         except ThrottleRateLimitExceededException as te:
             _LOGGER.warning(f"Throttling: {te.limit_type} for user {user_id} - {te.message}")
-            # Use the message from the exception, which is already user-friendly
+            self.metrics_manager.put_metric("ThrottledRequest", 1)
             return format_lambda_response(429, {"message": "Throttling limit hit for Reflection feedback"})
-
+        except ChatBotApiError as ce:
+            _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
+            self.metrics_manager.put_metric("ChatBotApiFailure", 1)
+            return format_lambda_response(ce.status_code, {"message": "AI service communication error."})
         except Exception as e:
             _LOGGER.error(f"Unexpected error in API handler: {str(e)}", exc_info=True)
             return format_lambda_response(500, {"message": "An unexpected server error occurred."})
@@ -299,6 +294,7 @@ class LearningEntriesApiHandler:
 def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
     _LOGGER.warning(event)
+    metrics_manager = MetricsManager("ThoughtfulPython/Authentication")
 
     try:
         learning_entries_table = LearningEntriesTable(get_learning_entries_table_name())
@@ -311,9 +307,12 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
             throttle_table=throttle_table,
             secrets_repo=secrets_repo,
             chatbot_wrapper=chatbot_wrapper,
+            metrics_manager=metrics_manager,
         )
         return api_handler.handle(event)
 
     except Exception as e:
         _LOGGER.critical(f"Critical error in global handler setup: {str(e)}", exc_info=True)
         return format_lambda_response(500, {"message": f"Internal server error during handler setup."})
+    finally:
+        metrics_manager.flush()

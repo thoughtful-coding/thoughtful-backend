@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
+from aws_src_sample.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
 
 
 def test_chatbot_wrapper_init() -> None:
@@ -89,7 +89,7 @@ def test_call_reflection_feedback_api_normal_behavior(mock_post):
     mock_post.assert_called_once()
 
 
-@pytest.mark.xfail(raises=ValueError)
+@pytest.mark.xfail(raises=ChatBotApiError)
 @patch("aws_src_sample.utils.chatbot_utils.requests.post")
 def test_call_reflection_feedback_api_abnormal_behavior(mock_post):
     mock_response = Mock()
@@ -175,9 +175,12 @@ def test_call_primm_feedback_api_normal_behavior(mock_post):
     mock_post.assert_called_once()
 
 
-@pytest.mark.xfail(raises=ValueError)
+@pytest.mark.xfail(raises=ChatBotApiError)
 @patch("aws_src_sample.utils.chatbot_utils.requests.post")
 def test_call_primm_feedback_api_abnormal_behavior(mock_post):
+    """
+    Test that if feedback is missing, we generate a ChatBot error
+    """
     mock_response = Mock()
     mock_response.status_code = 200
 

@@ -4,6 +4,7 @@ import typing
 
 from pydantic import ValidationError
 
+from aws_src_sample.cloudwatch.metrics import MetricsManager
 from aws_src_sample.dynamodb.primm_submissions_table import PrimmSubmissionsTable
 from aws_src_sample.dynamodb.throttle_table import (
     ThrottleRateLimitExceededException,
@@ -25,7 +26,7 @@ from aws_src_sample.utils.aws_env_vars import (
     get_throttle_table_name,
 )
 from aws_src_sample.utils.base_types import UserId
-from aws_src_sample.utils.chatbot_utils import ChatBotWrapper
+from aws_src_sample.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -38,11 +39,13 @@ class PrimmFeedbackApiHandler:
         secrets_repo: SecretsRepository,
         chatbot_wrapper: ChatBotWrapper,
         primm_submissions_table: PrimmSubmissionsTable,
+        metrics_manager: MetricsManager,
     ):
         self.throttle_table = throttle_table
         self.secrets_repo = secrets_repo
         self.chatbot_wrapper = chatbot_wrapper
         self.primm_submissions_table = primm_submissions_table
+        self.metrics_manager = metrics_manager
 
     def _handle_post_request(self, event: dict, user_id: UserId) -> dict:
         _LOGGER.info(f"Processing PRIMM feedback request for user_id: {user_id}")
@@ -110,15 +113,12 @@ class PrimmFeedbackApiHandler:
 
         except ThrottleRateLimitExceededException as te:
             _LOGGER.warning(f"Throttling limit hit for PRIMM feedback (user {user_id}): {te.limit_type} - {te.message}")
-            # The message from ThrottlingRateLimitExceededException is already user-friendly
+            self.metrics_manager.put_metric("ThrottledRequest", 1)
             return format_lambda_response(429, {"message": "Throttling limit hit for PRIMM feedback."})
-        except (ConnectionError, TimeoutError) as ce:  # Errors from ChatBotWrapper's _call_google_generative_api
+        except ChatBotApiError as ce:
             _LOGGER.error(f"AI Service communication error during PRIMM feedback: {str(ce)}", exc_info=True)
-            status_code = 504 if isinstance(ce, TimeoutError) else 503
-            return format_lambda_response(status_code, {"message": "AI evaluation service communication error."})
-        except ValueError as ve:  # Catch Pydantic validation errors from ChatBot response or other ValueErrors
-            _LOGGER.error(f"ValueError during PRIMM feedback processing: {str(ve)}", exc_info=True)
-            return format_lambda_response(400, {"message": "Invalid data processing for PRIMM feedback."})
+            self.metrics_manager.put_metric("ChatBotApiFailure", 1)
+            return format_lambda_response(ce.status_code, {"message": "AI evaluation service communication error."})
         except Exception as e:
             _LOGGER.error(f"Unexpected error in PrimmFeedbackApiHandler: {str(e)}", exc_info=True)
             return format_lambda_response(
@@ -130,6 +130,7 @@ class PrimmFeedbackApiHandler:
 def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
     _LOGGER.info(f"Global handler. Method: {event.get('httpMethod')}, Path: {event.get('path')}")
     _LOGGER.warning(event)
+    metrics_manager = MetricsManager("ThoughtfulPython/Authentication")
 
     try:
         throttle_table = ThrottleTable(get_throttle_table_name())
@@ -142,9 +143,12 @@ def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
             primm_submissions_table=primm_submissions_table,
             secrets_repo=secrets_repo,
             chatbot_wrapper=chatbot_wrapper,
+            metrics_manager=metrics_manager,
         )
         return api_handler.handle(event)
 
     except Exception as e:
         _LOGGER.critical(f"Critical error in global handler setup: {str(e)}", exc_info=True)
         return format_lambda_response(500, {"message": "Internal server error during handler setup."})
+    finally:
+        metrics_manager.flush()
