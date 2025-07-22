@@ -93,7 +93,7 @@ def authorizer_lambda_handler(event: dict, context: typing.Any) -> dict:
 
     try:
         handler = AuthorizerLambda(
-            metrics_manager=MetricsManager("ThoughtfulPython/Authentication"),
+            metrics_manager=metrics_manager,
             jwt_wrapper=JwtWrapper(),
             secrets_repo=SecretsRepository(),
         )
