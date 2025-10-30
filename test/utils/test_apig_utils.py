@@ -72,3 +72,31 @@ def test_format_lambda_response_2() -> None:
     assert ret["headers"]["Access-Control-Allow-Methods"] == "OPTIONS,GET,PUT"
     assert ret["headers"]["hi"] == "you"
     assert ret["body"] == None
+
+
+def test_format_lambda_response_3() -> None:
+    ret = format_lambda_response(200, {"hey": "there"}, event={"headers": {"origin": "evil.com"}})
+    assert ret["statusCode"] == 200
+    assert len(ret["headers"]) == 4
+    assert ret["headers"]["Content-Type"] == "application/json"
+    assert ret["headers"]["Access-Control-Allow-Origin"] == "null"
+    assert (
+        ret["headers"]["Access-Control-Allow-Headers"]
+        == "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token"
+    )
+    assert ret["headers"]["Access-Control-Allow-Methods"] == "OPTIONS,GET,PUT"
+    assert ret["body"] == '{"hey": "there"}'
+
+
+def test_format_lambda_response_4() -> None:
+    ret = format_lambda_response(200, {"hey": "there"}, event={"headers": {"origin": "https://example.github.io"}})
+    assert ret["statusCode"] == 200
+    assert len(ret["headers"]) == 4
+    assert ret["headers"]["Content-Type"] == "application/json"
+    assert ret["headers"]["Access-Control-Allow-Origin"] == "https://example.github.io"
+    assert (
+        ret["headers"]["Access-Control-Allow-Headers"]
+        == "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token"
+    )
+    assert ret["headers"]["Access-Control-Allow-Methods"] == "OPTIONS,GET,PUT"
+    assert ret["body"] == '{"hey": "there"}'

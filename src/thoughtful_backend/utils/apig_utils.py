@@ -1,6 +1,7 @@
 import base64
 import json
 import logging
+import re
 import typing
 
 from thoughtful_backend.utils.base_types import UserId
@@ -76,23 +77,59 @@ def get_user_id_from_event(event: dict[str, typing.Any]) -> typing.Optional[User
         return None
 
 
+def get_allowed_origin(event: dict[str, typing.Any]) -> str:
+    """
+    Validates the Origin header against allowed patterns and returns it if valid.
+
+    Allowed Origins:
+    - localhost/127.0.0.1 (any port) - for local development
+    - *.github.io - for GitHub Pages deployments (expected fork hosting)
+
+    :returns: The origin if valid, otherwise "null" (which causes browser to deny the response)
+    """
+    origin = event.get("headers", {}).get("origin", "")
+
+    # No origin header present (e.g., curl/Postman testing, direct API calls)
+    if not origin:
+        return "*"
+
+    # Allow localhost for development (any port)
+    if origin.startswith("http://localhost:") or origin.startswith("http://127.0.0.1:"):
+        return origin
+
+    # Allow GitHub Pages (expected hosting for forks)
+    allowed_patterns = [r"^https://.*\.github\.io$"]
+    for pattern in allowed_patterns:
+        if re.match(pattern, origin):
+            return origin
+
+    # Origin doesn't match allowed patterns - deny by returning "null"
+    _LOGGER.warning(f"Origin not in allowed patterns: {origin}")
+    return "null"
+
+
 def format_lambda_response(
     status_code: int,
     body: typing.Any,
     *,
+    event: typing.Optional[dict[str, typing.Any]] = None,
     additional_headers: typing.Optional[dict[str, str]] = None,
 ) -> dict[str, typing.Any]:
     """
-    Formats API Gateway proxy responses.
+    Formats API Gateway proxy responses with CORS headers.
     """
+    # Determine allowed origin based on request origin
+    allowed_origin = get_allowed_origin(event) if event else "*"
+
     headers = {
         "Content-Type": "application/json",
-        "Access-Control-Allow-Origin": "*",  # FIXME: Restrict in production
+        "Access-Control-Allow-Origin": allowed_origin,
         "Access-Control-Allow-Headers": "Content-Type,Authorization,X-Amz-Date,X-Api-Key,X-Amz-Security-Token",
         "Access-Control-Allow-Methods": "OPTIONS,GET,PUT",
     }
     if additional_headers:
         headers.update(additional_headers)
+
     return {
         "statusCode": status_code,
         "headers": headers,
