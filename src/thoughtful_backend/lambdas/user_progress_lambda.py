@@ -16,7 +16,7 @@ from thoughtful_backend.utils.apig_utils import (
     get_path,
     get_user_id_from_event,
 )
-from thoughtful_backend.utils.aws_env_vars import get_progress_table_name
+from thoughtful_backend.utils.aws_env_vars import get_user_progress_table_name
 from thoughtful_backend.utils.base_types import (
     IsoTimestamp,
     LessonId,
@@ -30,15 +30,15 @@ _LOGGER.setLevel(logging.INFO)
 
 
 class UserProgressApiHandler:
-    def __init__(self, progress_table: UserProgressTable):
-        self.progress_table = progress_table
+    def __init__(self, user_progress_table: UserProgressTable):
+        self.user_progress_table = user_progress_table
 
     def _aggregate_unit_progresses_for_user(self, user_id: UserId) -> UserProgressModel:
         """
         Fetches all unit-specific progress items for a user and aggregates them
         into a single UserProgressModel.
         """
-        progress_items: list[UserUnitProgressModel] = self.progress_table.get_all_unit_progress_for_user(user_id)
+        progress_items: list[UserUnitProgressModel] = self.user_progress_table.get_all_unit_progress_for_user(user_id)
 
         aggregated_completion: dict[UnitId, dict[LessonId, dict[SectionId, IsoTimestamp]]] = {}
 
@@ -66,7 +66,7 @@ class UserProgressApiHandler:
             if not batch_input.completions:
                 _LOGGER.info(f"No completions provided in PUT request for user {user_id}. Returning current progress.")
             else:
-                self.progress_table.batch_update_user_progress(user_id, batch_input.completions)
+                self.user_progress_table.batch_update_user_progress(user_id, batch_input.completions)
                 _LOGGER.info(f"Batch update processed for user {user_id}.")
 
             # After updates, fetch and return the complete aggregated progress
@@ -113,7 +113,7 @@ def user_progress_lambda_handler(event: dict[str, typing.Any], context: typing.A
 
     try:
         api_handler = UserProgressApiHandler(
-            progress_table=UserProgressTable(get_progress_table_name()),
+            user_progress_table=UserProgressTable(get_user_progress_table_name()),
         )
         return api_handler.handle(event)
 

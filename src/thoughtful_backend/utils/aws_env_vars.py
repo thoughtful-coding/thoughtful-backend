@@ -1,14 +1,6 @@
 import os
 
 
-def get_output_bucket_name() -> str:
-    return os.environ["OUTPUT_BUCKET_NAME"]
-
-
-def get_file_type_counter_table_name() -> str:
-    return os.environ["FILE_TYPE_COUNTER_TABLE_NAME"]
-
-
 def get_region() -> str:
     return os.environ["REGION"]
 
@@ -20,12 +12,8 @@ def _get_resource_by_env_var(env_var: str) -> str:
     return table_name
 
 
-def get_pong_score_table_name() -> str:
-    return _get_resource_by_env_var("PONG_SCORE_TABLE_NAME")
-
-
-def get_progress_table_name() -> str:
-    return _get_resource_by_env_var("PROGRESS_TABLE_NAME")
+def get_user_progress_table_name() -> str:
+    return _get_resource_by_env_var("USER_PROGRESS_TABLE_NAME")
 
 
 def get_learning_entries_table_name() -> str:

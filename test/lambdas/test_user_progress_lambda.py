@@ -34,12 +34,12 @@ def create_progress_event(
 
 
 def create_user_progress_api_handler(
-    progress_table=Mock(),
+    user_progress_table=Mock(),
 ) -> UserProgressApiHandler:
     handler = UserProgressApiHandler(
-        progress_table=progress_table,
+        user_progress_table=user_progress_table,
     )
-    assert handler.progress_table == progress_table
+    assert handler.user_progress_table == user_progress_table
     return handler
 
 
@@ -81,17 +81,17 @@ def test_handle_get_progress_for_new_user():
     user_id_str = "new_user_get_progress"
     event = create_progress_event(user_id_str, method="GET")
 
-    progress_table = Mock()
-    progress_table.get_all_unit_progress_for_user.return_value = []
+    user_progress_table = Mock()
+    user_progress_table.get_all_unit_progress_for_user.return_value = []
 
-    handler = create_user_progress_api_handler(progress_table=progress_table)
+    handler = create_user_progress_api_handler(user_progress_table=user_progress_table)
     response = handler.handle(event)
 
     assert response["statusCode"] == 200
     response_body = json.loads(response["body"])
     assert response_body["userId"] == user_id_str
     assert response_body["completion"] == {}
-    progress_table.get_all_unit_progress_for_user.assert_called_once_with(UserId(user_id_str))
+    user_progress_table.get_all_unit_progress_for_user.assert_called_once_with(UserId(user_id_str))
 
 
 def test_handle_get_progress_for_existing_user():
@@ -123,10 +123,10 @@ def test_handle_get_progress_for_existing_user():
             completion={LessonId(lesson2_guid_str): {SectionId(section2_id_str): IsoTimestamp(timestamp2)}},
         ),
     ]
-    progress_table = Mock()
-    progress_table.get_all_unit_progress_for_user.return_value = progress_list
+    user_progress_table = Mock()
+    user_progress_table.get_all_unit_progress_for_user.return_value = progress_list
 
-    handler = create_user_progress_api_handler(progress_table=progress_table)
+    handler = create_user_progress_api_handler(user_progress_table=user_progress_table)
     response = handler.handle(event)
 
     assert response["statusCode"] == 200
@@ -137,7 +137,7 @@ def test_handle_get_progress_for_existing_user():
         unit2_id_str: {lesson2_guid_str: {section2_id_str: timestamp2}},
     }
     assert response_body["completion"] == expected_completion
-    progress_table.get_all_unit_progress_for_user.assert_called_once_with(UserId(user_id_str))
+    user_progress_table.get_all_unit_progress_for_user.assert_called_once_with(UserId(user_id_str))
 
 
 def test_handle_put_progress_missing_body():
@@ -210,8 +210,8 @@ def test_handle_put_progress_successful_update():
     }
     event = create_progress_event(user_id_str, method="PUT", body=completions_payload)
 
-    progress_table = Mock()
-    progress_table.batch_update_user_progress.return_value = {}
+    user_progress_table = Mock()
+    user_progress_table.batch_update_user_progress.return_value = {}
 
     # Mock what get_all_unit_progress_for_user returns *after* the update
     timestamp = "2025-06-04"
@@ -227,9 +227,9 @@ def test_handle_put_progress_successful_update():
             completion={LessonId(lesson_guid2_str): {SectionId(section_id2_str): IsoTimestamp(timestamp)}},
         ),
     ]
-    progress_table.get_all_unit_progress_for_user.return_value = mock_aggregated_response_state
+    user_progress_table.get_all_unit_progress_for_user.return_value = mock_aggregated_response_state
 
-    handler = create_user_progress_api_handler(progress_table=progress_table)
+    handler = create_user_progress_api_handler(user_progress_table=user_progress_table)
     response = handler.handle(event)
 
     assert response["statusCode"] == 200
@@ -247,5 +247,7 @@ def test_handle_put_progress_successful_update():
             unitId=UnitId(unit_id2_str), lessonId=LessonId(lesson_guid2_str), sectionId=SectionId(section_id2_str)
         ),
     ]
-    progress_table.batch_update_user_progress.assert_called_once_with(UserId(user_id_str), expected_completions_input)
-    progress_table.get_all_unit_progress_for_user.assert_called_once_with(UserId(user_id_str))
+    user_progress_table.batch_update_user_progress.assert_called_once_with(
+        UserId(user_id_str), expected_completions_input
+    )
+    user_progress_table.get_all_unit_progress_for_user.assert_called_once_with(UserId(user_id_str))

@@ -24,8 +24,8 @@ from thoughtful_backend.utils.apig_utils import (
 from thoughtful_backend.utils.aws_env_vars import (
     get_learning_entries_table_name,
     get_primm_submissions_table_name,
-    get_progress_table_name,
     get_user_permissions_table_name,
+    get_user_progress_table_name,
 )
 from thoughtful_backend.utils.base_types import (
     InstructorId,
@@ -43,12 +43,12 @@ class InstructorPortalApiHandler:
     def __init__(
         self,
         user_permissions_table: UserPermissionsTable,
-        progress_table: UserProgressTable,
+        user_progress_table: UserProgressTable,
         learning_entries_table: LearningEntriesTable,
         primm_submissions_table: PrimmSubmissionsTable,
     ):
         self.user_permissions_table = user_permissions_table
-        self.progress_table = progress_table
+        self.user_progress_table = user_progress_table
         self.learning_entries_table = learning_entries_table
         self.primm_submissions_table = primm_submissions_table
 
@@ -90,7 +90,7 @@ class InstructorPortalApiHandler:
 
             student_progress_data_list: list[StudentUnitCompletionDataModel] = []
             for user_id in permitted_user_ids:
-                user_unit_progress = self.progress_table.get_user_unit_progress(
+                user_unit_progress = self.user_progress_table.get_user_unit_progress(
                     user_id=user_id,
                     unit_id=unit_id,
                 )
@@ -312,7 +312,7 @@ def instructor_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
     try:
         api_handler = InstructorPortalApiHandler(
             user_permissions_table=UserPermissionsTable(get_user_permissions_table_name()),
-            progress_table=UserProgressTable(get_progress_table_name()),
+            user_progress_table=UserProgressTable(get_user_progress_table_name()),
             learning_entries_table=LearningEntriesTable(get_learning_entries_table_name()),
             primm_submissions_table=PrimmSubmissionsTable(get_primm_submissions_table_name()),
         )

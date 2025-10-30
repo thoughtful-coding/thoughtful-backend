@@ -11,19 +11,19 @@ from ..test_utils.authorizer import add_authorizer_info
 
 def create_instructor_portal_api_handler(
     user_permissions_table=Mock(),
-    progress_table=Mock(),
+    user_progress_table=Mock(),
     learning_entries_table=Mock(),
     primm_submissions_table=Mock(),
 ) -> InstructorPortalApiHandler:
     ret = InstructorPortalApiHandler(
         user_permissions_table=user_permissions_table,
-        progress_table=progress_table,
+        user_progress_table=user_progress_table,
         learning_entries_table=learning_entries_table,
         primm_submissions_table=primm_submissions_table,
     )
 
     assert ret.user_permissions_table == user_permissions_table
-    assert ret.progress_table == progress_table
+    assert ret.user_progress_table == user_progress_table
     assert ret.learning_entries_table == learning_entries_table
     assert ret.primm_submissions_table == primm_submissions_table
     return ret
@@ -136,11 +136,11 @@ def test_user_progress_api_handler_handle_get_4():
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
-    progress_table = Mock()
-    progress_table.get_user_unit_progress.return_value = {}
+    user_progress_table = Mock()
+    user_progress_table.get_user_unit_progress.return_value = {}
     ret = create_instructor_portal_api_handler(
         user_permissions_table=user_permissions_table,
-        progress_table=progress_table,
+        user_progress_table=user_progress_table,
     )
     response = ret.handle(event)
 
@@ -165,11 +165,11 @@ def test_user_progress_api_handler_handle_get_5():
 
     user_permissions_table = Mock()
     user_permissions_table.get_permitted_student_ids_for_teacher.return_value = ["s1"]
-    progress_table = Mock()
-    progress_table.get_user_unit_progress.return_value = None
+    user_progress_table = Mock()
+    user_progress_table.get_user_unit_progress.return_value = None
     ret = create_instructor_portal_api_handler(
         user_permissions_table=user_permissions_table,
-        progress_table=progress_table,
+        user_progress_table=user_progress_table,
     )
     response = ret.handle(event)
 
