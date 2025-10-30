@@ -6,12 +6,12 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from aws_src_sample.dynamodb.user_progress_table import UserProgressTable
-from aws_src_sample.models.user_progress_models import (
+from thoughtful_backend.dynamodb.user_progress_table import UserProgressTable
+from thoughtful_backend.models.user_progress_models import (
     SectionCompletionInputModel,
     UserUnitProgressModel,
 )
-from aws_src_sample.utils.base_types import (
+from thoughtful_backend.utils.base_types import (
     IsoTimestamp,
     LessonId,
     SectionId,

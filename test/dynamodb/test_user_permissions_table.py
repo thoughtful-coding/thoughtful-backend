@@ -7,14 +7,14 @@ import pytest
 from moto import mock_aws
 
 # Assuming your DAL and types are structured like this
-from aws_src_sample.dynamodb.user_permissions_table import (
+from thoughtful_backend.dynamodb.user_permissions_table import (
     PermissionStatusType,
     PermissionType,
     UserPermissionsTable,
 )
 
 # If UserId and InstructorId are needed for type hints in tests:
-from aws_src_sample.utils.base_types import InstructorId, UserId
+from thoughtful_backend.utils.base_types import InstructorId, UserId
 
 REGION = "us-east-2"
 TABLE_NAME = "test-user-permissions"  # Test-specific table name

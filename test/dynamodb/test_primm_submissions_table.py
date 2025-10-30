@@ -7,13 +7,13 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from aws_src_sample.dynamodb.primm_submissions_table import PrimmSubmissionsTable
-from aws_src_sample.models.learning_entry_models import AssessmentLevel
-from aws_src_sample.models.primm_feedback_models import (
+from thoughtful_backend.dynamodb.primm_submissions_table import PrimmSubmissionsTable
+from thoughtful_backend.models.learning_entry_models import AssessmentLevel
+from thoughtful_backend.models.primm_feedback_models import (
     PrimmEvaluationRequestModel,
     PrimmEvaluationResponseModel,
 )
-from aws_src_sample.utils.base_types import UserId
+from thoughtful_backend.utils.base_types import UserId
 
 REGION = "us-east-2"
 TABLE_NAME = "test-primm-submissions"  # Use a test-specific table name

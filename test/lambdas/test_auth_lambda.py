@@ -1,10 +1,10 @@
 import json
 from unittest.mock import Mock, patch
 
-from aws_src_sample.dynamodb.refresh_token_table import RefreshTokenTable
-from aws_src_sample.lambdas.auth_lambda import AuthApiHandler
-from aws_src_sample.utils.base_types import RefreshTokenId, UserId
-from aws_src_sample.utils.jwt_utils import JwtWrapper
+from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
+from thoughtful_backend.lambdas.auth_lambda import AuthApiHandler
+from thoughtful_backend.utils.base_types import RefreshTokenId, UserId
+from thoughtful_backend.utils.jwt_utils import JwtWrapper
 
 MOCK_SECRET_KEY = "test-secret-key-for-jwt"
 MOCK_GOOGLE_CLIENT_ID = "test-google-client-id.apps.googleusercontent.com"
@@ -52,7 +52,7 @@ def test_handle_login_success():
 
     handler = create_auth_api_handler(token_table=mock_token_table, secrets_repo=mock_secret_repo)
 
-    with patch("aws_src_sample.lambdas.auth_lambda.requests.get") as mock_requests_get:
+    with patch("thoughtful_backend.lambdas.auth_lambda.requests.get") as mock_requests_get:
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {
@@ -81,7 +81,7 @@ def test_handle_login_google_token_invalid():
 
     handler = create_auth_api_handler(secrets_repo=mock_secret_repo)
 
-    with patch("aws_src_sample.lambdas.auth_lambda.requests.get") as mock_requests_get:
+    with patch("thoughtful_backend.lambdas.auth_lambda.requests.get") as mock_requests_get:
         mock_response = Mock()
         mock_response.raise_for_status.return_value = None
         mock_response.json.return_value = {"aud": "wrong-audience-id", "sub": MOCK_USER_ID}

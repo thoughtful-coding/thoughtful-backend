@@ -3,7 +3,7 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from aws_src_sample.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
+from thoughtful_backend.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
 
 
 def test_chatbot_wrapper_init() -> None:
@@ -49,7 +49,7 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_2() -> None:
     assert "**Student's Explanation:**\n\nAround\n" in prompt
 
 
-@patch("aws_src_sample.utils.chatbot_utils.requests.post")
+@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
 def test_call_reflection_feedback_api_normal_behavior(mock_post):
     mock_response = Mock()
     mock_response.status_code = 200
@@ -90,7 +90,7 @@ def test_call_reflection_feedback_api_normal_behavior(mock_post):
 
 
 @pytest.mark.xfail(raises=ChatBotApiError)
-@patch("aws_src_sample.utils.chatbot_utils.requests.post")
+@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
 def test_call_reflection_feedback_api_abnormal_behavior(mock_post):
     mock_response = Mock()
     mock_response.status_code = 200
@@ -133,7 +133,7 @@ def test_chatbot_wrapper_gen_primm_feedback_prompt() -> None:
     assert "```python\nfor i in range(4)\n```" in prompt
 
 
-@patch("aws_src_sample.utils.chatbot_utils.requests.post")
+@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
 def test_call_primm_feedback_api_normal_behavior(mock_post):
     mock_response = Mock()
     mock_response.status_code = 200
@@ -176,7 +176,7 @@ def test_call_primm_feedback_api_normal_behavior(mock_post):
 
 
 @pytest.mark.xfail(raises=ChatBotApiError)
-@patch("aws_src_sample.utils.chatbot_utils.requests.post")
+@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
 def test_call_primm_feedback_api_abnormal_behavior(mock_post):
     """
     Test that if feedback is missing, we generate a ChatBot error

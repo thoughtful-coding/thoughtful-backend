@@ -7,7 +7,7 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from aws_src_sample.dynamodb.throttle_table import (
+from thoughtful_backend.dynamodb.throttle_table import (
     DAILY_COUNT_SK_PREFIX,
     GLOBAL_DAILY_LIMIT_CALLS,
     USER_DAILY_LIMIT_CALLS,

@@ -3,8 +3,8 @@ import decimal
 import json
 from unittest.mock import Mock
 
-from aws_src_sample.lambdas.instructor_portal_lambda import InstructorPortalApiHandler
-from aws_src_sample.models.primm_feedback_models import StoredPrimmSubmissionItemModel
+from thoughtful_backend.lambdas.instructor_portal_lambda import InstructorPortalApiHandler
+from thoughtful_backend.models.primm_feedback_models import StoredPrimmSubmissionItemModel
 
 from ..test_utils.authorizer import add_authorizer_info
 

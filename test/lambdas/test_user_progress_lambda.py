@@ -3,8 +3,8 @@ import json
 import typing
 from unittest.mock import Mock
 
-from aws_src_sample.lambdas.user_progress_lambda import UserProgressApiHandler
-from aws_src_sample.models.user_progress_models import (
+from thoughtful_backend.lambdas.user_progress_lambda import UserProgressApiHandler
+from thoughtful_backend.models.user_progress_models import (
     IsoTimestamp,
     LessonId,
     SectionCompletionInputModel,

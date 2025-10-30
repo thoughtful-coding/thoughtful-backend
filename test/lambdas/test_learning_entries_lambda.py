@@ -2,9 +2,9 @@
 import json
 from unittest.mock import MagicMock, Mock
 
-from aws_src_sample.lambdas.learning_entries_lambda import LearningEntriesApiHandler
-from aws_src_sample.models.learning_entry_models import ReflectionVersionItemModel
-from aws_src_sample.utils.chatbot_utils import ChatBotFeedback
+from thoughtful_backend.lambdas.learning_entries_lambda import LearningEntriesApiHandler
+from thoughtful_backend.models.learning_entry_models import ReflectionVersionItemModel
+from thoughtful_backend.utils.chatbot_utils import ChatBotFeedback
 
 from ..test_utils.authorizer import add_authorizer_info
 

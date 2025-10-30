@@ -8,8 +8,8 @@ import pytest
 from moto import mock_aws
 
 # Adjust the import path based on your project structure
-from aws_src_sample.dynamodb.learning_entries_table import LearningEntriesTable
-from aws_src_sample.models.learning_entry_models import (
+from thoughtful_backend.dynamodb.learning_entries_table import LearningEntriesTable
+from thoughtful_backend.models.learning_entry_models import (
     AssessmentLevel,
     ReflectionVersionItemModel,
 )

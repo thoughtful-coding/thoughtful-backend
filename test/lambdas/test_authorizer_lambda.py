@@ -1,9 +1,9 @@
 #!/usr/bin/env python3
 from unittest.mock import Mock
 
-from aws_src_sample.lambdas.authorizer_lambda import AuthorizerLambda
-from aws_src_sample.utils.base_types import RefreshTokenId, UserId
-from aws_src_sample.utils.jwt_utils import JwtWrapper
+from thoughtful_backend.lambdas.authorizer_lambda import AuthorizerLambda
+from thoughtful_backend.utils.base_types import RefreshTokenId, UserId
+from thoughtful_backend.utils.jwt_utils import JwtWrapper
 
 MOCK_USER_ID = UserId("12345_google_user_sub")
 

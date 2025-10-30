@@ -2,8 +2,8 @@
 import json
 from unittest.mock import MagicMock, Mock
 
-from aws_src_sample.lambdas.primm_feedback_lambda import PrimmFeedbackApiHandler
-from aws_src_sample.models.primm_feedback_models import PrimmEvaluationResponseModel
+from thoughtful_backend.lambdas.primm_feedback_lambda import PrimmFeedbackApiHandler
+from thoughtful_backend.models.primm_feedback_models import PrimmEvaluationResponseModel
 
 from ..test_utils.authorizer import add_authorizer_info
 

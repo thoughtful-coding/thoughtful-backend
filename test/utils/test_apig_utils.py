@@ -1,4 +1,4 @@
-from aws_src_sample.utils.apig_utils import (
+from thoughtful_backend.utils.apig_utils import (
     format_lambda_response,
     get_event_body,
     get_method,

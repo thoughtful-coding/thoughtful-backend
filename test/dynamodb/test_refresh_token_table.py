@@ -5,8 +5,8 @@ import boto3
 import pytest
 from moto import mock_aws
 
-from aws_src_sample.dynamodb.refresh_token_table import RefreshTokenTable
-from aws_src_sample.utils.base_types import UserId
+from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
+from thoughtful_backend.utils.base_types import UserId
 
 REGION = "us-east-2"
 TABLE_NAME = "test-refresh-token-table"
