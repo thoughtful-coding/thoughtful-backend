@@ -57,7 +57,7 @@ def test_handle_unauthorized_access():
     response = handler.handle(event)
 
     assert response["statusCode"] == 401
-    assert "User identification failed" in json.loads(response["body"])["message"]
+    assert "Authentication failed" in json.loads(response["body"])["message"]
 
 
 def test_handle_unsupported_http_method():
@@ -71,7 +71,7 @@ def test_handle_unsupported_http_method():
     response = handler.handle(event)
 
     assert response["statusCode"] == 404
-    assert "Resource not found or method not allowed" in json.loads(response["body"])["message"]
+    assert "Resource not found" in json.loads(response["body"])["message"]
 
 
 def test_handle_get_progress_for_new_user():
@@ -168,7 +168,7 @@ def test_handle_put_progress_invalid_json():
     response = handler.handle(event)
 
     assert response["statusCode"] == 400
-    assert json.loads(response["body"])["message"] == "Invalid request for progress update."
+    assert json.loads(response["body"])["message"] == "Invalid request data"
 
 
 def test_handle_put_progress_validation_error():
@@ -184,7 +184,7 @@ def test_handle_put_progress_validation_error():
 
     assert response["statusCode"] == 400
     response_body = json.loads(response["body"])
-    assert response_body["message"] == "Invalid request for progress update."
+    assert response_body["message"] == "Invalid request data"
     assert "details" in response_body
 
 

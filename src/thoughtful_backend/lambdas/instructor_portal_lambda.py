@@ -12,6 +12,8 @@ from thoughtful_backend.models.instructor_portal_models import (
     StudentUnitCompletionDataModel,
 )
 from thoughtful_backend.utils.apig_utils import (
+    ErrorCode,
+    create_error_response,
     format_lambda_response,
     get_last_evaluated_key,
     get_method,
@@ -76,7 +78,7 @@ class InstructorPortalApiHandler:
 
         except Exception as e:
             _LOGGER.error(f"Error in for {instructor_id}: {e}", exc_info=True)
-            return format_lambda_response(500, {"message": "An error occurred while fetching student list."})
+            return create_error_response(ErrorCode.INTERNAL_ERROR)
 
     def _handle_get_class_unit_progress(self, instructor_id: InstructorId, unit_id: UnitId) -> dict:
         _LOGGER.info(f"Instructor {instructor_id} requesting class progress for unit {unit_id}")
@@ -117,7 +119,7 @@ class InstructorPortalApiHandler:
                 f"Error in _handle_get_class_unit_progress for instructor {instructor_id}, unit {unit_id}: {e}",
                 exc_info=True,
             )
-            return format_lambda_response(500, {"message": "An error occurred while fetching class unit progress."})
+            return create_error_response(ErrorCode.INTERNAL_ERROR)
 
     def _handle_get_student_learning_entries(
         self,
@@ -139,7 +141,7 @@ class InstructorPortalApiHandler:
         )
         if not has_permission:
             _LOGGER.warning(f"Forbidden: Instructor {instructor_id} lacks permission for student {student_id}.")
-            return format_lambda_response(403, {"message": "Forbidden"})
+            return create_error_response(ErrorCode.AUTHORIZATION_FAILED, event=event)
 
         try:
             query_params = get_query_string_parameters(event)
@@ -162,10 +164,7 @@ class InstructorPortalApiHandler:
                 f"Error fetching finalized learning entries for student {student_id}: {e}",
                 exc_info=True,
             )
-            return format_lambda_response(
-                500,
-                {"message": "An error occurred while fetching learning entries."},
-            )
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
     def _handle_get_assignment_submissions(self, instructor_id: InstructorId, event: dict) -> dict:
         _LOGGER.info(f"Instructor {instructor_id} requesting submissions for a specific assignment.")
@@ -174,14 +173,16 @@ class InstructorPortalApiHandler:
             path_params = get_path_parameters(event)
             query_params = get_query_string_parameters(event)
 
-            unit_id = UnitId(path_params.get("unitId"))
-            lesson_id = LessonId(path_params.get("lessonId"))
-            section_id = SectionId(path_params.get("sectionId"))
+            unit_id = UnitId(path_params.get("unitId", ""))
+            lesson_id = LessonId(path_params.get("lessonId", ""))
+            section_id = SectionId(path_params.get("sectionId", ""))
             assignment_type = query_params.get("assignmentType")
             primm_example_id = query_params.get("primmExampleId")
 
             if not all([unit_id, lesson_id, section_id, assignment_type]):
-                return format_lambda_response(400, {"message": "Missing required path or query parameters."})
+                return create_error_response(
+                    ErrorCode.VALIDATION_ERROR, "Missing required path or query parameters.", event=event
+                )
 
             permitted_students = self.user_permissions_table.get_permitted_student_ids_for_teacher(instructor_id)
             if not permitted_students:
@@ -242,14 +243,14 @@ class InstructorPortalApiHandler:
             _LOGGER.error(
                 f"Error in _handle_get_assignment_submissions for instructor {instructor_id}: {e}", exc_info=True
             )
-            return format_lambda_response(500, {"message": "An error occurred while fetching assignment submissions."})
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
     def handle(self, event: dict) -> dict:
         # Extract instructor_user_id from the authenticated user
         user_id = get_user_id_from_event(event)
         if not user_id:
             _LOGGER.warning("Unauthorized: No user_id found in event.")
-            return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
+            return create_error_response(ErrorCode.AUTHENTICATION_FAILED, event=event)
         instructor_id = InstructorId(user_id)
 
         http_method = get_method(event).upper()
@@ -274,7 +275,9 @@ class InstructorPortalApiHandler:
                     return self._handle_get_class_unit_progress(instructor_id, unit_id)
                 else:
                     _LOGGER.warning(f"Malformed path for class unit progress: {path}")
-                    return format_lambda_response(400, {"message": "Malformed URL for class unit progress."})
+                    return create_error_response(
+                        ErrorCode.VALIDATION_ERROR, "Malformed URL for class unit progress.", event=event
+                    )
 
             elif (
                 http_method == "GET" and path.startswith("/instructor/students/") and path.endswith("/learning-entries")
@@ -285,7 +288,9 @@ class InstructorPortalApiHandler:
                     return self._handle_get_student_learning_entries(instructor_id, student_id, event)
                 else:
                     _LOGGER.warning(f"Malformed path for class unit progress: {path}")
-                    return format_lambda_response(400, {"message": "Malformed URL for finalized learning entries."})
+                    return create_error_response(
+                        ErrorCode.VALIDATION_ERROR, "Malformed URL for finalized learning entries.", event=event
+                    )
 
             elif http_method == "GET" and len(path_parts) == 8 and path.endswith("/assignment-submissions"):
                 # Matches /instructor/units/{unitId}/lessons/{lessonId}/sections/{sectionId}/assignment-submissions
@@ -293,14 +298,14 @@ class InstructorPortalApiHandler:
 
             else:
                 _LOGGER.warning(f"Unsupported path or method for Teacher Portal: {http_method} {path}")
-                return format_lambda_response(404, {"message": "Resource not found or method not allowed."})
+                return create_error_response(ErrorCode.RESOURCE_NOT_FOUND, event=event)
 
         except Exception as e:
             _LOGGER.error(
                 f"Unexpected error in TeacherPortalApiHandler for instructor {instructor_id}: {str(e)}",
                 exc_info=True,
             )
-            return format_lambda_response(500, {"message": "An unexpected server error occurred."})
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
 
 # Global Lambda handler function (remains mostly the same, ensures UserProgressTable DAL is passed)
@@ -320,4 +325,4 @@ def instructor_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
 
     except Exception as e:
         _LOGGER.critical(f"Error in global handler setup: {str(e)}", exc_info=True)
-        return format_lambda_response(500, {"message": f"Internal server error during handler setup."})
+        return create_error_response(ErrorCode.INTERNAL_ERROR)

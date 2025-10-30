@@ -1,4 +1,5 @@
 import base64
+import enum
 import json
 import logging
 import re
@@ -11,6 +12,28 @@ _LOGGER = logging.getLogger(__name__)
 
 PathParams = typing.NewType("PathParams", dict[str, str])
 QueryParams = typing.NewType("QueryParams", dict[str, str])
+
+
+class ErrorCode(enum.Enum):
+    """
+    API error codes with associated HTTP status codes and default messages.
+
+    Each error code is defined as a tuple: (code_string, status_code, default_message)
+    """
+
+    VALIDATION_ERROR = ("VALIDATION_ERROR", 400, "Invalid request data")
+    AUTHENTICATION_FAILED = ("AUTHENTICATION_FAILED", 401, "Authentication failed")
+    AUTHORIZATION_FAILED = ("AUTHORIZATION_FAILED", 403, "Access denied")
+    RESOURCE_NOT_FOUND = ("RESOURCE_NOT_FOUND", 404, "Resource not found")
+    METHOD_NOT_ALLOWED = ("METHOD_NOT_ALLOWED", 405, "Method not allowed")
+    RATE_LIMIT_EXCEEDED = ("RATE_LIMIT_EXCEEDED", 429, "Rate limit exceeded")
+    AI_SERVICE_UNAVAILABLE = ("AI_SERVICE_UNAVAILABLE", 503, "AI service temporarily unavailable")
+    INTERNAL_ERROR = ("INTERNAL_ERROR", 500, "Internal server error")
+
+    def __init__(self, code: str, status_code: int, default_message: str):
+        self.code = code
+        self.status_code = status_code
+        self.default_message = default_message
 
 
 def get_event_body(event: dict) -> bytes:
@@ -135,3 +158,24 @@ def format_lambda_response(
         "headers": headers,
         "body": json.dumps(body) if body is not None else None,
     }
+
+
+def create_error_response(
+    error_code: ErrorCode,
+    message: typing.Optional[str] = None,
+    *,
+    details: typing.Optional[typing.Any] = None,
+    event: typing.Optional[dict[str, typing.Any]] = None,
+) -> dict[str, typing.Any]:
+    """
+    Creates a standardized error response following the OpenAPI ErrorResponse schema.
+    """
+    body = {
+        "message": message or error_code.default_message,
+        "errorCode": error_code.code,
+    }
+
+    if details is not None:
+        body["details"] = details
+
+    return format_lambda_response(error_code.status_code, body, event=event)

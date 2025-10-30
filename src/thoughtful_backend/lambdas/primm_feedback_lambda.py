@@ -16,6 +16,8 @@ from thoughtful_backend.models.primm_feedback_models import (
 )
 from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
 from thoughtful_backend.utils.apig_utils import (
+    ErrorCode,
+    create_error_response,
     format_lambda_response,
     get_method,
     get_path,
@@ -54,7 +56,7 @@ class PrimmFeedbackApiHandler:
             raw_body = event.get("body")
             if not raw_body:
                 _LOGGER.error("Request body is missing for PRIMM feedback.")
-                return format_lambda_response(400, {"message": "Request body is missing."})
+                return create_error_response(ErrorCode.VALIDATION_ERROR, "Request body is missing.", event=event)
 
             # Validate request body using Pydantic model
             request_data = PrimmEvaluationRequestModel.model_validate_json(raw_body)
@@ -64,10 +66,10 @@ class PrimmFeedbackApiHandler:
 
         except ValidationError as e:
             _LOGGER.error(f"PRIMM feedback request body validation error: {e.errors()}", exc_info=True)
-            return format_lambda_response(400, {"message": "Invalid request body for PRIMM feedback."})
+            return create_error_response(ErrorCode.VALIDATION_ERROR, details=e.errors(), event=event)
         except json.JSONDecodeError:
             _LOGGER.error("PRIMM feedback request body is not valid JSON.", exc_info=True)
-            return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
+            return create_error_response(ErrorCode.VALIDATION_ERROR, event=event)
 
         with self.throttle_table.throttle_action(user_id, "PRIMM_FEEDBACK_CHATBOT_API_CALL"):
             _LOGGER.info(f"Throttling check passed for user {user_id}. Calling ChatBot.")
@@ -99,7 +101,7 @@ class PrimmFeedbackApiHandler:
         _LOGGER.info(f"PRIMMFeedback.handle invoked for path: {get_path(event)}, method: {get_method(event)}")
         user_id = get_user_id_from_event(event)
         if not user_id:
-            return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
+            return create_error_response(ErrorCode.AUTHENTICATION_FAILED, event=event)
 
         http_method = get_method(event).upper()
         _LOGGER.info(f"PrimmFeedbackApiHandler received method: {http_method} for user_id: {user_id}")
@@ -109,21 +111,19 @@ class PrimmFeedbackApiHandler:
                 return self._handle_post_request(event, user_id)
             else:
                 _LOGGER.warning(f"Unsupported HTTP method for /primm-feedback: {http_method}")
-                return format_lambda_response(405, {"message": f"HTTP method not allowed on this path."})
+                return create_error_response(ErrorCode.METHOD_NOT_ALLOWED, event=event)
 
         except ThrottleRateLimitExceededException as te:
             _LOGGER.warning(f"Throttling limit hit for PRIMM feedback (user {user_id}): {te.limit_type} - {te.message}")
             self.metrics_manager.put_metric("ThrottledRequest", 1)
-            return format_lambda_response(429, {"message": "Throttling limit hit for PRIMM feedback."})
+            return create_error_response(ErrorCode.RATE_LIMIT_EXCEEDED, event=event)
         except ChatBotApiError as ce:
             _LOGGER.error(f"AI Service communication error during PRIMM feedback: {str(ce)}", exc_info=True)
             self.metrics_manager.put_metric("ChatBotApiFailure", 1)
-            return format_lambda_response(ce.status_code, {"message": "AI evaluation service communication error."})
+            return create_error_response(ErrorCode.AI_SERVICE_UNAVAILABLE, event=event)
         except Exception as e:
             _LOGGER.error(f"Unexpected error in PrimmFeedbackApiHandler: {str(e)}", exc_info=True)
-            return format_lambda_response(
-                500, {"message": "An unexpected server error occurred while evaluating PRIMM submission."}
-            )
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
 
 # Global Lambda handler function
@@ -149,6 +149,6 @@ def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
 
     except Exception as e:
         _LOGGER.critical(f"Critical error in global handler setup: {str(e)}", exc_info=True)
-        return format_lambda_response(500, {"message": "Internal server error during handler setup."})
+        return create_error_response(ErrorCode.INTERNAL_ERROR)
     finally:
         metrics_manager.flush()

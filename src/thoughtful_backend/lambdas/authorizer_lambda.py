@@ -4,7 +4,6 @@ import typing
 
 from thoughtful_backend.cloudwatch.metrics import MetricsManager
 from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
-from thoughtful_backend.utils.apig_utils import format_lambda_response
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
 
 _LOGGER = logging.getLogger(__name__)
@@ -100,6 +99,7 @@ def authorizer_lambda_handler(event: dict, context: typing.Any) -> dict:
         return handler.handle(event)
     except Exception as e:
         _LOGGER.critical(f"Critical error in auth_lambda_handler: {e}", exc_info=True)
-        return format_lambda_response(500, {"message": "Internal Server Error in Auth Handler"})
+        # Authorizers must return IAM policies, not HTTP responses. Deny access on critical errors.
+        return _generate_iam_policy("user", "Deny", "arn:aws:execute-api:*:*:*/*/*", {})
     finally:
         metrics_manager.flush()

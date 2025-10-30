@@ -11,6 +11,8 @@ from thoughtful_backend.models.user_progress_models import (
     UserUnitProgressModel,
 )
 from thoughtful_backend.utils.apig_utils import (
+    ErrorCode,
+    create_error_response,
     format_lambda_response,
     get_method,
     get_path,
@@ -59,7 +61,7 @@ class UserProgressApiHandler:
             raw_body = event.get("body")
             if not raw_body:
                 _LOGGER.error("Request body is missing for progress update.")
-                return format_lambda_response(400, {"message": "Request body is missing."})
+                return create_error_response(ErrorCode.VALIDATION_ERROR, "Request body is missing.", event=event)
 
             batch_input = BatchCompletionsInputModel.model_validate_json(raw_body)
 
@@ -76,17 +78,15 @@ class UserProgressApiHandler:
 
         except ValidationError as e:
             _LOGGER.error(f"Progress update request body validation error: {e.errors()}", exc_info=True)
-            return format_lambda_response(
-                400, {"message": "Invalid request for progress update.", "details": e.errors()}
-            )
+            return create_error_response(ErrorCode.VALIDATION_ERROR, details=e.errors(), event=event)
         except json.JSONDecodeError:
             _LOGGER.error("Progress update request body is not valid JSON.", exc_info=True)
-            return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
+            return create_error_response(ErrorCode.VALIDATION_ERROR, event=event)
 
     def handle(self, event: dict) -> dict:
         user_id = get_user_id_from_event(event)
         if not user_id:
-            return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
+            return create_error_response(ErrorCode.AUTHENTICATION_FAILED, event=event)
 
         http_method = get_method(event).upper()
         path = get_path(event)
@@ -100,11 +100,11 @@ class UserProgressApiHandler:
                 return self._handle_put_request(event, user_id)
             else:
                 _LOGGER.warning(f"Unsupported path or method for User Progress: {http_method} {path}")
-                return format_lambda_response(404, {"message": "Resource not found or method not allowed."})
+                return create_error_response(ErrorCode.RESOURCE_NOT_FOUND, event=event)
 
         except Exception as e:
             _LOGGER.error(f"Unexpected error in UserProgressApiHandler for user {user_id}: {str(e)}", exc_info=True)
-            return format_lambda_response(500, {"message": "An unexpected server error occurred."})
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
 
 def user_progress_lambda_handler(event: dict[str, typing.Any], context: typing.Any) -> dict[str, typing.Any]:
@@ -119,7 +119,7 @@ def user_progress_lambda_handler(event: dict[str, typing.Any], context: typing.A
 
     except ValueError as ve:
         _LOGGER.critical(f"Configuration error in user_progress_lambda_handler: {str(ve)}", exc_info=True)
-        return format_lambda_response(500, {"message": f"Server configuration error: {str(ve)}"})
+        return create_error_response(ErrorCode.INTERNAL_ERROR, "Server configuration error")
     except Exception as e:
         _LOGGER.critical(f"Error during UserProgressApiHandler: {str(e)}", exc_info=True)
-        return format_lambda_response(500, {"message": "Internal server error during handler setup or processing."})
+        return create_error_response(ErrorCode.INTERNAL_ERROR)

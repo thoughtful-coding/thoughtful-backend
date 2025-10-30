@@ -19,7 +19,9 @@ from thoughtful_backend.models.learning_entry_models import (
 )
 from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
 from thoughtful_backend.utils.apig_utils import (
+    ErrorCode,
     QueryParams,
+    create_error_response,
     format_lambda_response,
     get_last_evaluated_key,
     get_method,
@@ -219,7 +221,7 @@ class LearningEntriesApiHandler:
             return format_lambda_response(200, response_model.model_dump(exclude_none=True))
         else:
             _LOGGER.warning(f"No hit for path: {path}, pp: {path_params}, qp: {query_params}")
-            return format_lambda_response(404, {"message": "Resource not found."})
+            return create_error_response(ErrorCode.RESOURCE_NOT_FOUND, event=event)
 
     def _route_post_request(self, event: dict, user_id: UserId) -> dict:
         _LOGGER.info("Handling POST request")
@@ -236,10 +238,10 @@ class LearningEntriesApiHandler:
                 interaction_input = ReflectionInteractionInputModel.model_validate_json(raw_body)
             except ValidationError as e:
                 _LOGGER.error(f"Request body validation error: {e.errors()}", exc_info=True)
-                return format_lambda_response(400, {"message": "Invalid request body."})
+                return create_error_response(ErrorCode.VALIDATION_ERROR, details=e.errors(), event=event)
             except json.JSONDecodeError:
                 _LOGGER.error("Request body is not valid JSON.", exc_info=True)
-                return format_lambda_response(400, {"message": "Invalid JSON format in request body."})
+                return create_error_response(ErrorCode.VALIDATION_ERROR, event=event)
 
             if interaction_input.isFinal:
                 # Process final submission
@@ -255,13 +257,13 @@ class LearningEntriesApiHandler:
 
         else:
             _LOGGER.warning(f"No hit for path: {path}, pp: {path_params}")
-            return format_lambda_response(404, {"message": "Resource not found."})
+            return create_error_response(ErrorCode.RESOURCE_NOT_FOUND, event=event)
 
     def handle(self, event: dict) -> dict:
         _LOGGER.info(f"Learning.handle invoked for path: {get_path(event)}, method: {get_method(event)}")
         user_id = get_user_id_from_event(event)
         if not user_id:
-            return format_lambda_response(401, {"message": "Unauthorized: User identification failed."})
+            return create_error_response(ErrorCode.AUTHENTICATION_FAILED, event=event)
 
         http_method = get_method(event)
         _LOGGER.info("HTTP Method: %s for user_id: %s", http_method, user_id)
@@ -273,22 +275,22 @@ class LearningEntriesApiHandler:
                 return self._route_post_request(event, user_id)
             else:
                 _LOGGER.warning("Unsupported HTTP method for /learning-entries: %s", http_method)
-                return format_lambda_response(405, {"message": f"HTTP method not allowed on /progress."})
+                return create_error_response(ErrorCode.METHOD_NOT_ALLOWED, event=event)
 
         except ValueError as ve:
             _LOGGER.warning(f"ValueError in handler: {str(ve)}", exc_info=False)
-            return format_lambda_response(400, {"message": "ValueError handling incoming data."})
+            return create_error_response(ErrorCode.VALIDATION_ERROR, str(ve), event=event)
         except ThrottleRateLimitExceededException as te:
             _LOGGER.warning(f"Throttling: {te.limit_type} for user {user_id} - {te.message}")
             self.metrics_manager.put_metric("ThrottledRequest", 1)
-            return format_lambda_response(429, {"message": "Throttling limit hit for Reflection feedback"})
+            return create_error_response(ErrorCode.RATE_LIMIT_EXCEEDED, event=event)
         except ChatBotApiError as ce:
             _LOGGER.error(f"AI Service Error in handler: {str(ce)}", exc_info=True)
             self.metrics_manager.put_metric("ChatBotApiFailure", 1)
-            return format_lambda_response(ce.status_code, {"message": "AI service communication error."})
+            return create_error_response(ErrorCode.AI_SERVICE_UNAVAILABLE, event=event)
         except Exception as e:
             _LOGGER.error(f"Unexpected error in API handler: {str(e)}", exc_info=True)
-            return format_lambda_response(500, {"message": "An unexpected server error occurred."})
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
 
 def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
@@ -313,6 +315,6 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
 
     except Exception as e:
         _LOGGER.critical(f"Critical error in global handler setup: {str(e)}", exc_info=True)
-        return format_lambda_response(500, {"message": f"Internal server error during handler setup."})
+        return create_error_response(ErrorCode.INTERNAL_ERROR)
     finally:
         metrics_manager.flush()
