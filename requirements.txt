@@ -1,11 +1,19 @@
-numpy
-pandas
-numpy-stl
-boto3
-art
-pydantic
-pytest
-moto
-moto[dynamodb]
-PyJWT
-aws-embedded-metrics
+# All dependencies - versions pinned for stability
+# Last updated: 2025-10-30
+
+# AWS SDK and utilities
+boto3==1.40.62
+aws-embedded-metrics==3.3.0
+
+# Data validation and serialization
+pydantic==2.12.3
+
+# Authentication
+PyJWT==2.10.1
+
+# HTTP requests (for Google OAuth verification and AI API calls)
+requests==2.32.5
+
+# Testing dependencies
+pytest==8.4.2
+moto[dynamodb]==5.1.15
