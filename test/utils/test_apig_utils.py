@@ -130,7 +130,7 @@ def test_create_error_response_2() -> None:
 def test_create_error_response_3() -> None:
     validation_errors = [
         {"loc": ["body", "email"], "msg": "field required", "type": "value_error.missing"},
-        {"loc": ["body", "password"], "msg": "field required", "type": "value_error.missing"}
+        {"loc": ["body", "password"], "msg": "field required", "type": "value_error.missing"},
     ]
     response = create_error_response(ErrorCode.VALIDATION_ERROR, details=validation_errors)
 
