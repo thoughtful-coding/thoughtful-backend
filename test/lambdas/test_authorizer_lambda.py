@@ -2,7 +2,7 @@
 from unittest.mock import Mock
 
 from thoughtful_backend.lambdas.authorizer_lambda import AuthorizerLambda
-from thoughtful_backend.utils.base_types import RefreshTokenId, UserId
+from thoughtful_backend.utils.base_types import UserId
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
 
 MOCK_USER_ID = UserId("12345_google_user_sub")
@@ -28,12 +28,12 @@ def test_authorizer_lambda_handler_1() -> None:
     mock_secret_repo = Mock()
     mock_secret_repo.get_jwt_secret_key.return_value = "hey"
 
-    refresh_token, token_id, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secret_repo)
+    refresh_token, _, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secret_repo)
 
     event = {
         "version": "1.0",
         "type": "REQUEST",
-        "methodArn": "arn:aws:execute-api:us-east-2:598791268315:k3txasuuei/$default/PUT/progress",
+        "methodArn": "arn:aws:execute-api:us-west-1:598791268315:k3txasuuei/$default/PUT/progress",
         "identitySource": f"Bearer {refresh_token}",
         "authorizationToken": f"Bearer {refresh_token}",
         "resource": "",
@@ -45,7 +45,7 @@ def test_authorizer_lambda_handler_1() -> None:
         "queryStringParameters": {},
         "requestContext": {
             "apiId": "k3txasuuei",
-            "domainName": "k3txasuuei.execute-api.us-east-2.amazonaws.com",
+            "domainName": "k3txasuuei.execute-api.us-west-1.amazonaws.com",
             "domainPrefix": "k3txasuuei",
             "extendedRequestId": "MlOm4gNjiYcEMbg=",
             "httpMethod": "PUT",
@@ -66,5 +66,5 @@ def test_authorizer_lambda_handler_1() -> None:
     assert result["policyDocument"]["Statement"][0]["Action"] == "execute-api:Invoke"
     assert (
         result["policyDocument"]["Statement"][0]["Resource"]
-        == "arn:aws:execute-api:None:598791268315:k3txasuuei/$default/*"
+        == "arn:aws:execute-api:us-west-1:598791268315:k3txasuuei/$default/*"
     )

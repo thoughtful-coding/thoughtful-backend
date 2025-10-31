@@ -1,15 +1,15 @@
 import os
 
 
-def get_region() -> str:
-    return os.environ["REGION"]
-
-
 def _get_resource_by_env_var(env_var: str) -> str:
     table_name = os.environ.get(env_var)
     if not table_name:
         raise ValueError(f"Missing environment variable: {env_var}")
     return table_name
+
+
+def get_aws_region() -> str:
+    return _get_resource_by_env_var("AWS_REGION")
 
 
 def get_user_progress_table_name() -> str:

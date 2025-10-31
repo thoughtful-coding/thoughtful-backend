@@ -16,24 +16,9 @@ from thoughtful_backend.dynamodb.throttle_table import (
     ThrottleTable,
 )
 
-REGION = "us-east-2"
+REGION = "us-west-1"
 TABLE_NAME = "test-throttling-store"
 DEFAULT_ACTION_TYPE = "CHATBOT_API_CALL"
-
-
-@pytest.fixture(scope="function")
-def aws_credentials() -> typing.Iterator:
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
-    os.environ["AWS_DEFAULT_REGION"] = REGION
-    yield
-    del os.environ["AWS_ACCESS_KEY_ID"]
-    del os.environ["AWS_SECRET_ACCESS_KEY"]
-    del os.environ["AWS_SECURITY_TOKEN"]
-    del os.environ["AWS_SESSION_TOKEN"]
-    del os.environ["AWS_DEFAULT_REGION"]
 
 
 @pytest.fixture

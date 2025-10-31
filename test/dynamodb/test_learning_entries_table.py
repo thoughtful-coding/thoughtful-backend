@@ -14,7 +14,7 @@ from thoughtful_backend.models.learning_entry_models import (
     ReflectionVersionItemModel,
 )
 
-REGION = "us-east-2"  # Consistent region for tests
+REGION = "us-west-1"
 TABLE_NAME = "test-learning-entry-versions-table"
 GSI_NAME = "UserFinalLearningEntriesIndex"  # From LearningEntriesTable class
 
@@ -48,22 +48,6 @@ def create_sample_item(
         "finalEntryCreatedAt": timestamp_str if is_final else None,
     }
     return ReflectionVersionItemModel(**item_data)
-
-
-@pytest.fixture(scope="function")
-def aws_credentials() -> typing.Iterator:
-    """Mocked AWS Credentials for moto."""
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
-    os.environ["AWS_DEFAULT_REGION"] = REGION
-    yield
-    del os.environ["AWS_ACCESS_KEY_ID"]
-    del os.environ["AWS_SECRET_ACCESS_KEY"]
-    del os.environ["AWS_SECURITY_TOKEN"]
-    del os.environ["AWS_SESSION_TOKEN"]
-    del os.environ["AWS_DEFAULT_REGION"]
 
 
 @pytest.fixture

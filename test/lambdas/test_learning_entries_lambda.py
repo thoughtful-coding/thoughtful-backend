@@ -119,7 +119,7 @@ def test_learning_entries_api_handler_handle_get_reflection_3():
             "authorization": "Bearer ..-----",
             "content-length": "0",
             "content-type": "application/json",
-            "host": "123456.execute-api.us-east-2.amazonaws.com",
+            "host": "123456.execute-api.us-west-1.amazonaws.com",
             "origin": "http://localhost:5173",
             "priority": "u=1, i",
             "referer": "http://localhost:5173/",
@@ -147,7 +147,7 @@ def test_learning_entries_api_handler_handle_get_reflection_3():
                     "scopes": None,
                 }
             },
-            "domainName": "123456.execute-api.us-east-2.amazonaws.com",
+            "domainName": "123456.execute-api.us-west-1.amazonaws.com",
             "domainPrefix": "123456",
             "http": {
                 "method": "GET",

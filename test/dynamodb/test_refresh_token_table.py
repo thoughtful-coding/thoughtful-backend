@@ -8,19 +8,8 @@ from moto import mock_aws
 from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
 from thoughtful_backend.utils.base_types import UserId
 
-REGION = "us-east-2"
+REGION = "us-west-1"
 TABLE_NAME = "test-refresh-token-table"
-
-
-@pytest.fixture
-def aws_credentials():
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_DEFAULT_REGION"] = REGION
-    yield
-    del os.environ["AWS_ACCESS_KEY_ID"]
-    del os.environ["AWS_SECRET_ACCESS_KEY"]
-    del os.environ["AWS_DEFAULT_REGION"]
 
 
 @pytest.fixture

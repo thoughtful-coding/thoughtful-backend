@@ -5,6 +5,7 @@ import typing
 from thoughtful_backend.cloudwatch.metrics import MetricsManager
 from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
+from thoughtful_backend.utils.aws_env_vars import get_aws_region
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -39,7 +40,7 @@ class AuthorizerLambda:
     def handle(self, event: dict) -> dict:
         try:
             # These context variables are provided by the Lambda runtime environment
-            region = os.environ.get("AWS_REGION")
+            region = get_aws_region()
             aws_account_id = event["methodArn"].split(":")[4]
             api_id = event["requestContext"]["apiId"]
             stage = event["requestContext"]["stage"]

@@ -16,33 +16,15 @@ from thoughtful_backend.dynamodb.user_permissions_table import (
 # If UserId and InstructorId are needed for type hints in tests:
 from thoughtful_backend.utils.base_types import InstructorId, UserId
 
-REGION = "us-east-2"
-TABLE_NAME = "test-user-permissions"  # Test-specific table name
+REGION = "us-west-1"
+TABLE_NAME = "test-user-permissions"
 
 # Define constants for permission types and statuses to use in tests
-# These should ideally match or be imported from where your DAL defines/uses them
-# For this test, we'll redefine them for clarity if not easily importable as constants
 PT_VIEW_FULL: PermissionType = "VIEW_STUDENT_DATA_FULL"
 PT_VIEW_SUMMARY: PermissionType = "VIEW_STUDENT_PROGRESS_SUMMARY"
 PS_ACTIVE: PermissionStatusType = "ACTIVE"
 PS_INACTIVE: PermissionStatusType = "INACTIVE"
 PS_PENDING: PermissionStatusType = "PENDING"
-
-
-@pytest.fixture(scope="function")
-def aws_credentials() -> typing.Iterator:
-    """Mocks AWS Credentials for moto."""
-    os.environ["AWS_ACCESS_KEY_ID"] = "testing"
-    os.environ["AWS_SECRET_ACCESS_KEY"] = "testing"
-    os.environ["AWS_SECURITY_TOKEN"] = "testing"
-    os.environ["AWS_SESSION_TOKEN"] = "testing"
-    os.environ["AWS_DEFAULT_REGION"] = REGION
-    yield
-    del os.environ["AWS_ACCESS_KEY_ID"]
-    del os.environ["AWS_SECRET_ACCESS_KEY"]
-    del os.environ["AWS_SECURITY_TOKEN"]
-    del os.environ["AWS_SESSION_TOKEN"]
-    del os.environ["AWS_DEFAULT_REGION"]
 
 
 @pytest.fixture
