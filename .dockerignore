@@ -1,0 +1,65 @@
+# Version control
+.git
+.gitignore
+.github
+
+# CI/CD
+.ci-cd
+.gitlab-ci.yml
+
+# Documentation (exclude from image)
+*.md
+!README.md
+TODO.md
+CLAUDE.md
+ERROR_RESPONSE_FORMAT.md
+DEPLOYMENT_IMPROVEMENTS.md
+GITHUB_MIGRATION.md
+
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+*.egg-info/
+dist/
+build/
+
+# Testing
+test/
+.pytest_cache/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+*.cover
+.tox/
+
+# Virtual environments
+.venv/
+venv/
+ENV/
+env/
+
+# IDE
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Environment files
+.env
+.env.*
+.envrc
+
+# Logs
+*.log
+logs/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
