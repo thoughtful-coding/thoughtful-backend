@@ -153,13 +153,19 @@ jobs:
 
           echo "Triggering infrastructure pipeline for main branch with IMAGE_TAG=${IMAGE_TAG}"
 
-          # If infrastructure moved to GitHub (repository_dispatch)
+          # Trigger GitHub CDK repository (repository_dispatch)
           if [ -n "${{ secrets.INFRA_REPO_TOKEN }}" ]; then
             curl --request POST \
                  --fail \
                  --url "https://api.github.com/repos/${{ secrets.INFRA_REPO_OWNER }}/${{ secrets.INFRA_REPO_NAME }}/dispatches" \
                  --header "Accept: application/vnd.github.v3+json" \
                  --header "Authorization: Bearer ${{ secrets.INFRA_REPO_TOKEN }}" \
-                 --data "{\"event_type\":\"deploy\",\"client_payload\":{\"image_tag\":\"${IMAGE_TAG}\"}}"
-            echo "GitHub infrastructure workflow triggered successfully"
+                 --data "{\"event_type\":\"backend-deployed\",\"client_payload\":{\"imageTag\":\"${IMAGE_TAG}\"}}"
+            echo "GitHub CDK workflow triggered successfully with imageTag=${IMAGE_TAG}"
+          else
+            echo "Warning: INFRA_REPO_TOKEN not set. Skipping CDK deployment trigger."
+            echo "To enable automatic CDK deployment, set the following secrets:"
+            echo "  - INFRA_REPO_TOKEN: GitHub Personal Access Token with 'repo' scope"
+            echo "  - INFRA_REPO_OWNER: thoughtful-coding"
+            echo "  - INFRA_REPO_NAME: thoughtful-deploy-cdk"
           fi
