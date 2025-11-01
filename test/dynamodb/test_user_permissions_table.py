@@ -17,7 +17,7 @@ from thoughtful_backend.dynamodb.user_permissions_table import (
 from thoughtful_backend.utils.base_types import InstructorId, UserId
 
 REGION = "us-west-1"
-TABLE_NAME = "test-user-permissions"
+TABLE_NAME = "UserPermissionsTable"
 
 # Define constants for permission types and statuses to use in tests
 PT_VIEW_FULL: PermissionType = "VIEW_STUDENT_DATA_FULL"

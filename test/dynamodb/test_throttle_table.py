@@ -17,7 +17,7 @@ from thoughtful_backend.dynamodb.throttle_table import (
 )
 
 REGION = "us-west-1"
-TABLE_NAME = "test-throttling-store"
+TABLE_NAME = "ThrottleTable"
 DEFAULT_ACTION_TYPE = "CHATBOT_API_CALL"
 
 

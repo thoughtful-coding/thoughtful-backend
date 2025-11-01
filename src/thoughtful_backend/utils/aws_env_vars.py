@@ -25,7 +25,7 @@ def get_primm_submissions_table_name() -> str:
 
 
 def get_throttle_table_name() -> str:
-    return _get_resource_by_env_var("THROTTLING_TABLE_NAME")
+    return _get_resource_by_env_var("THROTTLE_TABLE_NAME")
 
 
 def get_refresh_token_table_name() -> str:

@@ -16,7 +16,7 @@ from thoughtful_backend.models.primm_feedback_models import (
 from thoughtful_backend.utils.base_types import UserId
 
 REGION = "us-west-1"
-TABLE_NAME = "test-primm-submissions"
+TABLE_NAME = "PrimmSubmissionsTable"
 
 
 @pytest.fixture

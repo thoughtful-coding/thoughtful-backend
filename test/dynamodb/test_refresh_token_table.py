@@ -9,7 +9,7 @@ from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
 from thoughtful_backend.utils.base_types import UserId
 
 REGION = "us-west-1"
-TABLE_NAME = "test-refresh-token-table"
+TABLE_NAME = "RefreshTokenTable"
 
 
 @pytest.fixture

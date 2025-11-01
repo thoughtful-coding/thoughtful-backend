@@ -20,7 +20,7 @@ from thoughtful_backend.utils.base_types import (
 )
 
 REGION = "us-west-1"
-TABLE_NAME = "test-user-progress-table-pk-sk"
+TABLE_NAME = "UserProgressTable"
 
 
 @pytest.fixture

@@ -15,8 +15,8 @@ from thoughtful_backend.models.learning_entry_models import (
 )
 
 REGION = "us-west-1"
-TABLE_NAME = "test-learning-entry-versions-table"
-GSI_NAME = "UserFinalLearningEntriesIndex"  # From LearningEntriesTable class
+TABLE_NAME = "LearningEntriesTable"
+GSI_NAME = "UserFinalLearningEntriesIndex"
 
 
 # Helper to create a sample item
