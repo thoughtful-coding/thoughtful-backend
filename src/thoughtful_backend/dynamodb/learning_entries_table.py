@@ -75,11 +75,11 @@ class LearningEntriesTable:
         section_id: SectionId,
         limit: int = 20,
         last_evaluated_key: typing.Optional[dict[str, typing.Any]] = None,
-        filter_mode: typing.Literal["all", "drafts_only"] = "drafts_only",
+        filter_mode: typing.Literal["all", "drafts"] = "drafts",
     ) -> tuple[list[ReflectionVersionItemModel], typing.Optional[dict[str, typing.Any]]]:
         """
         Retrieves versions for a user, lesson, and section.
-        - filter_mode 'drafts_only': Returns only items where isFinal is false. (Default)
+        - filter_mode 'drafts': Returns only items where isFinal is false. (Default)
         - filter_mode 'all': Returns all items for the section.
         """
         sk_prefix = f"{lesson_id}#{section_id}#"
@@ -94,7 +94,7 @@ class LearningEntriesTable:
             query_kwargs["ExclusiveStartKey"] = last_evaluated_key
 
         # Conditionally add the filter expression based on the new parameter
-        if filter_mode == "drafts_only":
+        if filter_mode == "drafts":
             query_kwargs["FilterExpression"] = Attr("isFinal").eq(False)
 
         try:
@@ -111,39 +111,57 @@ class LearningEntriesTable:
             )
             raise
 
-    def get_finalized_entries_for_user(
+    def get_entries_for_user(
         self,
         user_id: UserId,
+        filter_mode: typing.Literal["all", "final", "drafts"] = "all",
         limit: int = 50,
         last_evaluated_key: typing.Optional[dict[str, typing.Any]] = None,
     ) -> tuple[list[ReflectionVersionItemModel], typing.Optional[dict[str, typing.Any]]]:
         """
-        Retrieves finalized learning entries (isFinal=true) for a user via GSI.
-        Returns a list of Pydantic models and the pagination key.
-        Items returned will have their own aiFeedback/Assessment as null.
-        """
-        logger.info(f"Fetching finalized entries for userId: {user_id} using GSI: {self.GSI_FINAL_ENTRIES_INDEX_NAME}")
+        Retrieves learning entries for a user with optional filtering.
+        - filter_mode 'final': Returns only finalized entries (isFinal=true) using GSI
+        - filter_mode 'drafts': Returns only draft entries (isFinal=false)
+        - filter_mode 'all': Returns all entries (both drafts and final)
 
-        query_kwargs: dict[str, typing.Any] = {
-            "IndexName": self.GSI_FINAL_ENTRIES_INDEX_NAME,
-            "KeyConditionExpression": Key("userId").eq(user_id),  # GSI PK
-            # GSI SK is finalEntryCreatedAt, sorting by it
-            "ScanIndexForward": False,  # Newest first
-            "Limit": limit,
-        }
+        Returns a list of Pydantic models and the pagination key.
+        """
+        logger.info(f"Fetching entries for userId: {user_id} with filter_mode: {filter_mode}")
+
+        # For finalized entries, use the GSI for better performance
+        if filter_mode == "final":
+            query_kwargs: dict[str, typing.Any] = {
+                "IndexName": self.GSI_FINAL_ENTRIES_INDEX_NAME,
+                "KeyConditionExpression": Key("userId").eq(user_id),
+                "ScanIndexForward": False,  # Newest first
+                "Limit": limit,
+            }
+        else:
+            # For 'all' or 'drafts', query the main table by userId
+            query_kwargs: dict[str, typing.Any] = {
+                "KeyConditionExpression": Key("userId").eq(user_id),
+                "ScanIndexForward": False,  # Newest first
+                "Limit": limit,
+            }
+            # Add filter expression for drafts mode
+            if filter_mode == "drafts":
+                query_kwargs["FilterExpression"] = Attr("isFinal").eq(False)
+
         if last_evaluated_key:
             query_kwargs["ExclusiveStartKey"] = last_evaluated_key
 
         try:
             response = self.table.query(**query_kwargs)
             ddb_items = response.get("Items", [])
-            items = self._parse_items(ddb_items)  # These are ReflectionVersionItemModel where isFinal=true
+            items = self._parse_items(ddb_items)
             new_last_evaluated_key = response.get("LastEvaluatedKey")
-            logger.info(f"Found {len(items)} finalized items. Has more: {bool(new_last_evaluated_key)}")
+            logger.info(
+                f"Found {len(items)} items with filter_mode '{filter_mode}'. Has more: {bool(new_last_evaluated_key)}"
+            )
             return items, new_last_evaluated_key
         except ClientError as e:
             logger.error(
-                f"Error fetching finalized entries for userId: {user_id} from GSI: {e.response['Error']['Message']}",
+                f"Error fetching entries for userId: {user_id} with filter_mode '{filter_mode}': {e.response['Error']['Message']}",
                 exc_info=True,
             )
             raise
@@ -184,7 +202,7 @@ class LearningEntriesTable:
         """
         Retrieves the most recent draft version (isFinal=false) for a specific user, lesson, and section.
         """
-        drafts, _ = self.get_versions_for_section(user_id, lesson_id, section_id, limit=2, filter_mode="drafts_only")
+        drafts, _ = self.get_versions_for_section(user_id, lesson_id, section_id, limit=2, filter_mode="drafts")
         if drafts:
             logger.info(f"Found most recent draft for {user_id} - {lesson_id}#{section_id}: {drafts[0].versionId}")
             return drafts[0]

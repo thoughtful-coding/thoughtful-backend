@@ -222,7 +222,7 @@ def test_user_progress_api_handler_handle_get_7():
     user_permissions_table = Mock()
     user_permissions_table.check_permission.return_value = True
     learning_entries_table = Mock()
-    learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    learning_entries_table.get_entries_for_user.return_value = ([], None)
     ret = create_instructor_portal_api_handler(
         user_permissions_table=user_permissions_table,
         learning_entries_table=learning_entries_table,

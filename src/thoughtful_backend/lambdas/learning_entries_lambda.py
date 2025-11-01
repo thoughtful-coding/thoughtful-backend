@@ -195,14 +195,14 @@ class LearningEntriesApiHandler:
     ) -> ListOfFinalLearningEntriesResponseModel:
         _LOGGER.info(f"Fetching FINALIZED entries for user {user_id}")
 
-        # DAL returns ReflectionVersionItemModel instances where isFinal=true
-        final_ddb_items, next_last_key = self.learning_entries_table.get_finalized_entries_for_user(
+        # Use the general filtering method with filter_mode="final"
+        final_ddb_items, next_last_key = self.learning_entries_table.get_entries_for_user(
             user_id,
+            filter_mode="final",
             limit=get_pagination_limit(query_params),
             last_evaluated_key=get_last_evaluated_key(query_params),
         )
 
-        # As per user: GET /learning-entries is NOT enriched. It returns ReflectionVersionItemModel list.
         return ListOfFinalLearningEntriesResponseModel(entries=final_ddb_items, lastEvaluatedKey=next_last_key)
 
     def _route_get_request(self, event: dict, user_id: UserId) -> dict:

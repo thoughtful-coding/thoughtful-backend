@@ -188,7 +188,7 @@ def test_learning_entries_api_handler_handle_get_finalized_1():
     add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    learning_entries_table.get_entries_for_user.return_value = ([], None)
     leah = create_learning_entries_api_handler(learning_entries_table=learning_entries_table)
     response = leah.handle(event)
 
@@ -209,7 +209,7 @@ def test_learning_entries_api_handler_handle_get_finalized_2():
     add_authorizer_info(event, "e")
 
     learning_entries_table = Mock()
-    learning_entries_table.get_finalized_entries_for_user.return_value = ([], None)
+    learning_entries_table.get_entries_for_user.return_value = ([], None)
     leah = create_learning_entries_api_handler(learning_entries_table=learning_entries_table)
     response = leah.handle(event)
 

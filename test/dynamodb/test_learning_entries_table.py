@@ -146,7 +146,7 @@ def test_get_draft_versions_for_section_multiple_items_and_sorting(
         user_id,
         lesson_id,
         section_id,
-        filter_mode="drafts_only",
+        filter_mode="drafts",
     )
 
     assert len(drafts) == 3
@@ -163,7 +163,7 @@ def test_get_draft_versions_for_section_empty(learning_entries_table_instance: L
         "user-empty-drafts",
         "l-empty",
         "s-empty",
-        filter_mode="drafts_only",
+        filter_mode="drafts",
     )
     assert len(drafts) == 0
     assert last_key is None
@@ -189,7 +189,7 @@ def test_get_draft_versions_pagination(learning_entries_table_instance: Learning
         lesson_id,
         section_id,
         limit=2,
-        filter_mode="drafts_only",
+        filter_mode="drafts",
     )
     assert len(page1_items) == 2
     assert last_key1 is not None
@@ -204,7 +204,7 @@ def test_get_draft_versions_pagination(learning_entries_table_instance: Learning
         section_id,
         limit=2,
         last_evaluated_key=last_key1,
-        filter_mode="drafts_only",
+        filter_mode="drafts",
     )
     assert len(page2_items) == 2
     assert last_key2 is not None
@@ -219,7 +219,7 @@ def test_get_draft_versions_pagination(learning_entries_table_instance: Learning
         section_id,
         limit=2,
         last_evaluated_key=last_key2,
-        filter_mode="drafts_only",
+        filter_mode="drafts",
     )
     assert len(page3_items) == 1
     assert last_key3 is None  # No more items
@@ -294,7 +294,7 @@ def test_get_finalized_entries_for_user(learning_entries_table_instance: Learnin
     learning_entries_table_instance.save_item(final_u1_item2)
     learning_entries_table_instance.save_item(final_u2_item1)
 
-    final_entries, _ = learning_entries_table_instance.get_finalized_entries_for_user(user_id1)
+    final_entries, _ = learning_entries_table_instance.get_entries_for_user(user_id1, filter_mode="final")
     assert len(final_entries) == 2
     # GSI query with ScanIndexForward=False should return newest first
     assert final_entries[0].versionId == final_u1_item2.versionId
@@ -312,6 +312,8 @@ def test_get_finalized_entries_for_user_empty(learning_entries_table_instance: L
     draft = create_sample_item("user-no-finals", "l", "s", is_final=False)
     learning_entries_table_instance.save_item(draft)
 
-    final_entries, last_key = learning_entries_table_instance.get_finalized_entries_for_user("user-no-finals")
+    final_entries, last_key = learning_entries_table_instance.get_entries_for_user(
+        "user-no-finals", filter_mode="final"
+    )
     assert len(final_entries) == 0
     assert last_key is None

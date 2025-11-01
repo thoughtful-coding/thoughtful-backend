@@ -128,16 +128,16 @@ class InstructorPortalApiHandler:
         event: dict,
     ) -> dict:
         """
-        Handles an instructor's request to view a specific student's finalized learning entries.
-        This mirrors the functionality of the student-facing "Learning Entries" page.
+        Handles an instructor's request to view a specific student's learning entries.
+        Supports filtering by 'all', 'final', or 'drafts' via the ?filter query parameter.
         """
-        _LOGGER.info(f"Instructor {instructor_id} requesting FINALIZED learning entries for student {student_id}")
+        _LOGGER.info(f"Instructor {instructor_id} requesting learning entries for student {student_id}")
 
         # 1. Permission Check: Ensure the instructor is allowed to view this student's data.
         has_permission = self.user_permissions_table.check_permission(
             granter_user_id=student_id,
             grantee_user_id=instructor_id,
-            permission_type="VIEW_STUDENT_DATA_FULL",  # Or a more specific permission if available
+            permission_type="VIEW_STUDENT_DATA_FULL",
         )
         if not has_permission:
             _LOGGER.warning(f"Forbidden: Instructor {instructor_id} lacks permission for student {student_id}.")
@@ -146,14 +146,27 @@ class InstructorPortalApiHandler:
         try:
             query_params = get_query_string_parameters(event)
 
-            final_entries, next_last_key = self.learning_entries_table.get_finalized_entries_for_user(
+            # Get filter parameter (default to 'all')
+            filter_param = query_params.get("filter", "all")
+
+            # Validate filter parameter
+            if filter_param not in ["all", "final", "drafts"]:
+                _LOGGER.warning(f"Invalid filter parameter: {filter_param}")
+                return create_error_response(
+                    ErrorCode.VALIDATION_ERROR,
+                    f"Invalid filter parameter. Must be 'all', 'final', or 'drafts'.",
+                    event=event,
+                )
+
+            entries, next_last_key = self.learning_entries_table.get_entries_for_user(
                 user_id=student_id,
+                filter_mode=filter_param,  # type: ignore
                 limit=get_pagination_limit(query_params),
                 last_evaluated_key=get_last_evaluated_key(query_params),
             )
 
             response_payload = {
-                "entries": [item.model_dump(by_alias=True, exclude_none=True) for item in final_entries],
+                "entries": [item.model_dump(by_alias=True, exclude_none=True) for item in entries],
                 "lastEvaluatedKey": next_last_key,
             }
 
@@ -161,7 +174,7 @@ class InstructorPortalApiHandler:
 
         except Exception as e:
             _LOGGER.error(
-                f"Error fetching finalized learning entries for student {student_id}: {e}",
+                f"Error fetching learning entries for student {student_id}: {e}",
                 exc_info=True,
             )
             return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
