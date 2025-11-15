@@ -7,6 +7,7 @@ from pydantic import ValidationError
 from thoughtful_backend.dynamodb.user_progress_table import UserProgressTable
 from thoughtful_backend.models.user_progress_models import (
     BatchCompletionsInputModel,
+    SectionCompletionDetail,
     UserProgressModel,
     UserUnitProgressModel,
 )
@@ -42,7 +43,7 @@ class UserProgressApiHandler:
         """
         progress_items: list[UserUnitProgressModel] = self.user_progress_table.get_all_unit_progress_for_user(user_id)
 
-        aggregated_completion: dict[UnitId, dict[LessonId, dict[SectionId, IsoTimestamp]]] = {}
+        aggregated_completion: dict[UnitId, dict[LessonId, dict[SectionId, SectionCompletionDetail]]] = {}
 
         for unit_progress_item in progress_items:
             if unit_progress_item.completion:

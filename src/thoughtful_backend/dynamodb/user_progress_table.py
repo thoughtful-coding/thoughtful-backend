@@ -8,6 +8,7 @@ from botocore.exceptions import ClientError
 from pydantic import ValidationError
 
 from thoughtful_backend.models.user_progress_models import (
+    SectionCompletionDetail,
     SectionCompletionInputModel,
     UserUnitProgressModel,
 )
@@ -131,9 +132,16 @@ class UserProgressTable:
                     progress_model_to_update.completion[lesson_id] = {}
 
                 if section_id not in progress_model_to_update.completion[lesson_id]:
-                    progress_model_to_update.completion[lesson_id][section_id] = completion_timestamp
+                    completion_detail = SectionCompletionDetail(
+                        completed_at=completion_timestamp,
+                        attempts_before_success=comp_input.attemptsBeforeSuccess,
+                    )
+                    progress_model_to_update.completion[lesson_id][section_id] = completion_detail
                     unit_was_modified = True
-                    _LOGGER.debug(f"Marked section {unit_id}/{lesson_id}/{section_id} as complete for user {user_id}.")
+                    _LOGGER.debug(
+                        f"Marked section {unit_id}/{lesson_id}/{section_id} as complete for user {user_id} "
+                        f"with {comp_input.attemptsBeforeSuccess} attempts."
+                    )
                 else:
                     _LOGGER.debug(f"Section {unit_id}/{lesson_id}/{section_id} already marked for user {user_id}.")
 

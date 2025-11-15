@@ -8,6 +8,7 @@ from moto import mock_aws
 
 from thoughtful_backend.dynamodb.user_progress_table import UserProgressTable
 from thoughtful_backend.models.user_progress_models import (
+    SectionCompletionDetail,
     SectionCompletionInputModel,
     UserUnitProgressModel,
 )
@@ -54,7 +55,7 @@ def progress_table_instance(dynamodb_table_object) -> UserProgressTable:
 def _create_db_item_for_unit(
     user_id: UserId,
     unit_id: UnitId,
-    completions: typing.Dict[LessonId, typing.Dict[SectionId, IsoTimestamp]],
+    completions: typing.Dict[LessonId, typing.Dict[SectionId, SectionCompletionDetail]],
 ) -> dict:
     model = UserUnitProgressModel(
         userId=user_id,
@@ -76,9 +77,10 @@ def test_get_user_unit_progress_exists(progress_table_instance: UserProgressTabl
     unit_id = UnitId("math_unit")
     lesson1_guid = LessonId("guid_lesson_math1")
     section1_id = SectionId("sec_intro")
-    timestamp1 = datetime.now(timezone.utc).isoformat()
+    timestamp1 = IsoTimestamp(datetime.now(timezone.utc).isoformat())
 
-    test_completions = {lesson1_guid: {section1_id: timestamp1}}
+    completion_detail = SectionCompletionDetail(completed_at=timestamp1, attempts_before_success=1)
+    test_completions = {lesson1_guid: {section1_id: completion_detail}}
     db_item = _create_db_item_for_unit(user_id, unit_id, test_completions)
 
     # Use the DAL's table object to put the item for setup
@@ -104,8 +106,11 @@ def test_get_all_unit_progress_multiple_units(progress_table_instance: UserProgr
     lessonA1_guid = LessonId("guid_lA1")
     lessonB1_guid = LessonId("guid_lB1")
 
-    db_item1 = _create_db_item_for_unit(user_id, unit1_id, {lessonA1_guid: {"s1": "tsA1"}})
-    db_item2 = _create_db_item_for_unit(user_id, unit2_id, {lessonB1_guid: {"sX": "tsBX"}})
+    detail1 = SectionCompletionDetail(completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=2)
+    detail2 = SectionCompletionDetail(completed_at=IsoTimestamp("2025-01-02T00:00:00Z"), attempts_before_success=1)
+
+    db_item1 = _create_db_item_for_unit(user_id, unit1_id, {lessonA1_guid: {"s1": detail1}})
+    db_item2 = _create_db_item_for_unit(user_id, unit2_id, {lessonB1_guid: {"sX": detail2}})
 
     progress_table_instance.table.put_item(Item=db_item1)
     progress_table_instance.table.put_item(Item=db_item2)
@@ -119,9 +124,9 @@ def test_get_all_unit_progress_multiple_units(progress_table_instance: UserProgr
 
     for item in results:
         if item.unitId == unit1_id:
-            assert item.completion == {lessonA1_guid: {"s1": "tsA1"}}
+            assert item.completion == {lessonA1_guid: {"s1": detail1}}
         elif item.unitId == unit2_id:
-            assert item.completion == {lessonB1_guid: {"sX": "tsBX"}}
+            assert item.completion == {lessonB1_guid: {"sX": detail2}}
 
 
 # --- Tests for batch_update_user_progress ---
@@ -133,7 +138,9 @@ def test_batch_update_new_user_new_unit_new_lesson_new_section(progress_table_in
     lesson_guid = LessonId("new_lesson_guid")
     section_id = SectionId("new_section")
 
-    completions_to_add = [SectionCompletionInputModel(unitId=unit_id, lessonId=lesson_guid, sectionId=section_id)]
+    completions_to_add = [
+        SectionCompletionInputModel(unitId=unit_id, lessonId=lesson_guid, sectionId=section_id, attemptsBeforeSuccess=3)
+    ]
 
     updated_units_map = progress_table_instance.batch_update_user_progress(user_id, completions_to_add)
 
@@ -145,8 +152,11 @@ def test_batch_update_new_user_new_unit_new_lesson_new_section(progress_table_in
     assert updated_unit_progress.unitId == unit_id
     assert lesson_guid in updated_unit_progress.completion
     assert section_id in updated_unit_progress.completion[lesson_guid]
-    assert isinstance(updated_unit_progress.completion[lesson_guid][section_id], str)  # Timestamp
-    # assert updated_unit_progress.last_updated_at is not None # Removed
+
+    completion_detail = updated_unit_progress.completion[lesson_guid][section_id]
+    assert isinstance(completion_detail, SectionCompletionDetail)
+    assert completion_detail.attempts_before_success == 3
+    assert completion_detail.completed_at is not None
 
     # Verify directly from DB
     db_check = progress_table_instance.get_user_unit_progress(user_id, unit_id)
@@ -163,11 +173,18 @@ def test_batch_update_existing_user_existing_unit_new_lesson(progress_table_inst
     sectionB_id = SectionId("sectionB")
 
     # Pre-populate with lesson1 progress
-    initial_completions = {lesson1_guid: {sectionA_id: "initial_timestamp"}}
+    initial_detail = SectionCompletionDetail(
+        completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=1
+    )
+    initial_completions = {lesson1_guid: {sectionA_id: initial_detail}}
     initial_item = _create_db_item_for_unit(user_id, unit_id, initial_completions)
     progress_table_instance.table.put_item(Item=initial_item)
 
-    completions_to_add = [SectionCompletionInputModel(unitId=unit_id, lessonId=lesson2_guid, sectionId=sectionB_id)]
+    completions_to_add = [
+        SectionCompletionInputModel(
+            unitId=unit_id, lessonId=lesson2_guid, sectionId=sectionB_id, attemptsBeforeSuccess=2
+        )
+    ]
     updated_units_map = progress_table_instance.batch_update_user_progress(user_id, completions_to_add)
 
     assert unit_id in updated_units_map
@@ -188,11 +205,18 @@ def test_batch_update_existing_user_existing_unit_existing_lesson_new_section(
     section1_id = SectionId("section1")
     section2_id = SectionId("section2")  # New section for existing lesson
 
-    initial_completions = {lesson_guid: {section1_id: "initial_ts"}}
+    initial_detail = SectionCompletionDetail(
+        completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=1
+    )
+    initial_completions = {lesson_guid: {section1_id: initial_detail}}
     initial_item = _create_db_item_for_unit(user_id, unit_id, initial_completions)
     progress_table_instance.table.put_item(Item=initial_item)
 
-    completions_to_add = [SectionCompletionInputModel(unitId=unit_id, lessonId=lesson_guid, sectionId=section2_id)]
+    completions_to_add = [
+        SectionCompletionInputModel(
+            unitId=unit_id, lessonId=lesson_guid, sectionId=section2_id, attemptsBeforeSuccess=4
+        )
+    ]
     updated_units_map = progress_table_instance.batch_update_user_progress(user_id, completions_to_add)
 
     assert unit_id in updated_units_map
@@ -209,22 +233,24 @@ def test_batch_update_section_already_completed_preserves_original_timestamp(
     unit_id = UnitId("unit_ts")
     lesson_guid = LessonId("lesson_ts_guid")
     section_id = SectionId("section_ts")
-    original_timestamp = "2025-01-01T00:00:00Z"
 
-    initial_completions = {lesson_guid: {section_id: original_timestamp}}
+    original_detail = SectionCompletionDetail(
+        completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=2
+    )
+    initial_completions = {lesson_guid: {section_id: original_detail}}
     initial_item = _create_db_item_for_unit(user_id, unit_id, initial_completions)
     progress_table_instance.table.put_item(Item=initial_item)
 
     completions_to_add = [  # Attempt to complete the same section again
-        SectionCompletionInputModel(unitId=unit_id, lessonId=lesson_guid, sectionId=section_id)
+        SectionCompletionInputModel(unitId=unit_id, lessonId=lesson_guid, sectionId=section_id, attemptsBeforeSuccess=5)
     ]
     updated_units_map = progress_table_instance.batch_update_user_progress(user_id, completions_to_add)
 
     assert unit_id in updated_units_map
     updated_unit_progress = updated_units_map[unit_id]
 
-    # Timestamp should be the original one
-    assert updated_unit_progress.completion[lesson_guid][section_id] == original_timestamp
+    # Detail should be the original one (not updated)
+    assert updated_unit_progress.completion[lesson_guid][section_id] == original_detail
 
 
 def test_batch_update_multiple_units_and_lessons(progress_table_instance: UserProgressTable):
@@ -236,10 +262,18 @@ def test_batch_update_multiple_units_and_lessons(progress_table_instance: UserPr
     lessonY1_guid = LessonId("LY1")
 
     completions_to_add = [
-        SectionCompletionInputModel(unitId=unit1_id, lessonId=lessonX1_guid, sectionId=SectionId("sA")),
-        SectionCompletionInputModel(unitId=unit1_id, lessonId=lessonX1_guid, sectionId=SectionId("sB")),
-        SectionCompletionInputModel(unitId=unit1_id, lessonId=lessonX2_guid, sectionId=SectionId("sC")),
-        SectionCompletionInputModel(unitId=unit2_id, lessonId=lessonY1_guid, sectionId=SectionId("sD")),
+        SectionCompletionInputModel(
+            unitId=unit1_id, lessonId=lessonX1_guid, sectionId=SectionId("sA"), attemptsBeforeSuccess=1
+        ),
+        SectionCompletionInputModel(
+            unitId=unit1_id, lessonId=lessonX1_guid, sectionId=SectionId("sB"), attemptsBeforeSuccess=2
+        ),
+        SectionCompletionInputModel(
+            unitId=unit1_id, lessonId=lessonX2_guid, sectionId=SectionId("sC"), attemptsBeforeSuccess=3
+        ),
+        SectionCompletionInputModel(
+            unitId=unit2_id, lessonId=lessonY1_guid, sectionId=SectionId("sD"), attemptsBeforeSuccess=1
+        ),
     ]
     updated_units_map = progress_table_instance.batch_update_user_progress(user_id, completions_to_add)
 

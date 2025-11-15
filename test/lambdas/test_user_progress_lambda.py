@@ -5,13 +5,16 @@ from unittest.mock import Mock
 
 from thoughtful_backend.lambdas.user_progress_lambda import UserProgressApiHandler
 from thoughtful_backend.models.user_progress_models import (
+    SectionCompletionDetail,
+    SectionCompletionInputModel,
+    UserUnitProgressModel,
+)
+from thoughtful_backend.utils.base_types import (
     IsoTimestamp,
     LessonId,
-    SectionCompletionInputModel,
     SectionId,
     UnitId,
     UserId,
-    UserUnitProgressModel,
 )
 
 from ..test_utils.authorizer import add_authorizer_info
@@ -104,23 +107,26 @@ def test_handle_get_progress_for_existing_user():
     unit1_id_str = "math101"
     lesson1_guid_str = "lesson_guid_algebra"
     section1_id_str = "section_vars"
-    timestamp1 = "2025-06-03"
+    timestamp1 = "2025-06-03T00:00:00Z"
 
     unit2_id_str = "history101"
     lesson2_guid_str = "lesson_guid_ww2"
     section2_id_str = "section_causes"
-    timestamp2 = "2025-06-04"
+    timestamp2 = "2025-06-04T00:00:00Z"
+
+    detail1 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp1), attempts_before_success=2)
+    detail2 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp2), attempts_before_success=1)
 
     progress_list = [
         UserUnitProgressModel(
             userId=UserId(user_id_str),
             unitId=UnitId(unit1_id_str),
-            completion={LessonId(lesson1_guid_str): {SectionId(section1_id_str): IsoTimestamp(timestamp1)}},
+            completion={LessonId(lesson1_guid_str): {SectionId(section1_id_str): detail1}},
         ),
         UserUnitProgressModel(
             userId=UserId(user_id_str),
             unitId=UnitId(unit2_id_str),
-            completion={LessonId(lesson2_guid_str): {SectionId(section2_id_str): IsoTimestamp(timestamp2)}},
+            completion={LessonId(lesson2_guid_str): {SectionId(section2_id_str): detail2}},
         ),
     ]
     user_progress_table = Mock()
@@ -133,8 +139,8 @@ def test_handle_get_progress_for_existing_user():
     response_body = json.loads(response["body"])
     assert response_body["userId"] == user_id_str
     expected_completion = {
-        unit1_id_str: {lesson1_guid_str: {section1_id_str: timestamp1}},
-        unit2_id_str: {lesson2_guid_str: {section2_id_str: timestamp2}},
+        unit1_id_str: {lesson1_guid_str: {section1_id_str: {"completedAt": timestamp1, "attemptsBeforeSuccess": 2}}},
+        unit2_id_str: {lesson2_guid_str: {section2_id_str: {"completedAt": timestamp2, "attemptsBeforeSuccess": 1}}},
     }
     assert response_body["completion"] == expected_completion
     user_progress_table.get_all_unit_progress_for_user.assert_called_once_with(UserId(user_id_str))
@@ -204,8 +210,18 @@ def test_handle_put_progress_successful_update():
 
     completions_payload = {
         "completions": [
-            {"unitId": unit_id1_str, "lessonId": lesson_guid1_str, "sectionId": section_id1_str},
-            {"unitId": unit_id2_str, "lessonId": lesson_guid2_str, "sectionId": section_id2_str},
+            {
+                "unitId": unit_id1_str,
+                "lessonId": lesson_guid1_str,
+                "sectionId": section_id1_str,
+                "attemptsBeforeSuccess": 3,
+            },
+            {
+                "unitId": unit_id2_str,
+                "lessonId": lesson_guid2_str,
+                "sectionId": section_id2_str,
+                "attemptsBeforeSuccess": 1,
+            },
         ]
     }
     event = create_progress_event(user_id_str, method="PUT", body=completions_payload)
@@ -214,17 +230,20 @@ def test_handle_put_progress_successful_update():
     user_progress_table.batch_update_user_progress.return_value = {}
 
     # Mock what get_all_unit_progress_for_user returns *after* the update
-    timestamp = "2025-06-04"
+    timestamp = "2025-06-04T00:00:00Z"
+    detail1 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp), attempts_before_success=3)
+    detail2 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp), attempts_before_success=1)
+
     mock_aggregated_response_state = [
         UserUnitProgressModel(
             userId=UserId(user_id_str),
             unitId=UnitId(unit_id1_str),
-            completion={LessonId(lesson_guid1_str): {SectionId(section_id1_str): IsoTimestamp(timestamp)}},
+            completion={LessonId(lesson_guid1_str): {SectionId(section_id1_str): detail1}},
         ),
         UserUnitProgressModel(
             userId=UserId(user_id_str),
             unitId=UnitId(unit_id2_str),
-            completion={LessonId(lesson_guid2_str): {SectionId(section_id2_str): IsoTimestamp(timestamp)}},
+            completion={LessonId(lesson_guid2_str): {SectionId(section_id2_str): detail2}},
         ),
     ]
     user_progress_table.get_all_unit_progress_for_user.return_value = mock_aggregated_response_state
@@ -235,16 +254,28 @@ def test_handle_put_progress_successful_update():
     assert response["statusCode"] == 200
     response_body = json.loads(response["body"])
     assert response_body["userId"] == user_id_str
-    assert response_body["completion"][unit_id1_str][lesson_guid1_str][section_id1_str] == timestamp
-    assert response_body["completion"][unit_id2_str][lesson_guid2_str][section_id2_str] == timestamp
+    assert response_body["completion"][unit_id1_str][lesson_guid1_str][section_id1_str] == {
+        "completedAt": timestamp,
+        "attemptsBeforeSuccess": 3,
+    }
+    assert response_body["completion"][unit_id2_str][lesson_guid2_str][section_id2_str] == {
+        "completedAt": timestamp,
+        "attemptsBeforeSuccess": 1,
+    }
 
     # Verify DAL calls
     expected_completions_input = [
         SectionCompletionInputModel(
-            unitId=UnitId(unit_id1_str), lessonId=LessonId(lesson_guid1_str), sectionId=SectionId(section_id1_str)
+            unitId=UnitId(unit_id1_str),
+            lessonId=LessonId(lesson_guid1_str),
+            sectionId=SectionId(section_id1_str),
+            attemptsBeforeSuccess=3,
         ),
         SectionCompletionInputModel(
-            unitId=UnitId(unit_id2_str), lessonId=LessonId(lesson_guid2_str), sectionId=SectionId(section_id2_str)
+            unitId=UnitId(unit_id2_str),
+            lessonId=LessonId(lesson_guid2_str),
+            sectionId=SectionId(section_id2_str),
+            attemptsBeforeSuccess=1,
         ),
     ]
     user_progress_table.batch_update_user_progress.assert_called_once_with(
