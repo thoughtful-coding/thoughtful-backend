@@ -14,18 +14,21 @@ def create_instructor_portal_api_handler(
     user_progress_table=Mock(),
     learning_entries_table=Mock(),
     primm_submissions_table=Mock(),
+    first_solutions_table=Mock(),
 ) -> InstructorPortalApiHandler:
     ret = InstructorPortalApiHandler(
         user_permissions_table=user_permissions_table,
         user_progress_table=user_progress_table,
         learning_entries_table=learning_entries_table,
         primm_submissions_table=primm_submissions_table,
+        first_solutions_table=first_solutions_table,
     )
 
     assert ret.user_permissions_table == user_permissions_table
     assert ret.user_progress_table == user_progress_table
     assert ret.learning_entries_table == learning_entries_table
     assert ret.primm_submissions_table == primm_submissions_table
+    assert ret.first_solutions_table == first_solutions_table
     return ret
 
 

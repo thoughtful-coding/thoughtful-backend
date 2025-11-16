@@ -32,6 +32,7 @@ def setup_test_environment():
     os.environ["PRIMM_SUBMISSIONS_TABLE_NAME"] = "test-primm-submissions-table"
     os.environ["USER_PERMISSIONS_TABLE_NAME"] = "test-user-permissions-table"
     os.environ["THROTTLING_TABLE_NAME"] = "test-throttle-table"
+    os.environ["FIRST_SOLUTIONS_TABLE_NAME"] = "test-first-solutions-table"
 
     # AWS Secrets Manager ARNs
     os.environ["JWT_SECRET_ARN"] = "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-jwt-secret"

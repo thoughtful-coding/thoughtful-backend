@@ -4,6 +4,7 @@ import typing
 
 from pydantic import ValidationError
 
+from thoughtful_backend.dynamodb.first_solutions_table import FirstSolutionsTable
 from thoughtful_backend.dynamodb.user_progress_table import UserProgressTable
 from thoughtful_backend.models.user_progress_models import (
     BatchCompletionsInputModel,
@@ -19,7 +20,7 @@ from thoughtful_backend.utils.apig_utils import (
     get_path,
     get_user_id_from_event,
 )
-from thoughtful_backend.utils.aws_env_vars import get_user_progress_table_name
+from thoughtful_backend.utils.aws_env_vars import get_first_solutions_table_name, get_user_progress_table_name
 from thoughtful_backend.utils.base_types import (
     IsoTimestamp,
     LessonId,
@@ -33,8 +34,9 @@ _LOGGER.setLevel(logging.INFO)
 
 
 class UserProgressApiHandler:
-    def __init__(self, user_progress_table: UserProgressTable):
+    def __init__(self, user_progress_table: UserProgressTable, first_solutions_table: FirstSolutionsTable):
         self.user_progress_table = user_progress_table
+        self.first_solutions_table = first_solutions_table
 
     def _aggregate_unit_progresses_for_user(self, user_id: UserId) -> UserProgressModel:
         """
@@ -69,6 +71,37 @@ class UserProgressApiHandler:
             if not batch_input.completions:
                 _LOGGER.info(f"No completions provided in PUT request for user {user_id}. Returning current progress.")
             else:
+                # Save first solutions if provided (before updating progress)
+                for completion in batch_input.completions:
+                    if completion.firstCompletionContent:
+                        try:
+                            self.first_solutions_table.save_first_solution(
+                                user_id=user_id,
+                                unit_id=completion.unitId,
+                                lesson_id=completion.lessonId,
+                                section_id=completion.sectionId,
+                                solution=completion.firstCompletionContent,
+                                question_type="testing",
+                            )
+                            _LOGGER.info(
+                                f"Saved first solution for user {user_id}, "
+                                f"section {completion.unitId}/{completion.lessonId}/{completion.sectionId}"
+                            )
+                        except ValueError as ve:
+                            # Solution exceeds max length - log and skip
+                            _LOGGER.warning(
+                                f"Skipping first solution save for user {user_id}, "
+                                f"section {completion.unitId}/{completion.lessonId}/{completion.sectionId}: {ve}"
+                            )
+                        except Exception as e:
+                            # Non-fatal error - log and continue
+                            _LOGGER.error(
+                                f"Error saving first solution for user {user_id}, "
+                                f"section {completion.unitId}/{completion.lessonId}/{completion.sectionId}: {e}",
+                                exc_info=True,
+                            )
+
+                # Update progress in DynamoDB
                 self.user_progress_table.batch_update_user_progress(user_id, batch_input.completions)
                 _LOGGER.info(f"Batch update processed for user {user_id}.")
 
@@ -115,6 +148,7 @@ def user_progress_lambda_handler(event: dict[str, typing.Any], context: typing.A
     try:
         api_handler = UserProgressApiHandler(
             user_progress_table=UserProgressTable(get_user_progress_table_name()),
+            first_solutions_table=FirstSolutionsTable(get_first_solutions_table_name()),
         )
         return api_handler.handle(event)
 

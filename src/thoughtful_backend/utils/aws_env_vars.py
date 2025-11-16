@@ -36,6 +36,10 @@ def get_user_permissions_table_name() -> str:
     return _get_resource_by_env_var("USER_PERMISSIONS_TABLE_NAME")
 
 
+def get_first_solutions_table_name() -> str:
+    return _get_resource_by_env_var("FIRST_SOLUTIONS_TABLE_NAME")
+
+
 def get_chatbot_api_key_secret_arn() -> str:
     """
     Gets the AWS Secrets Manager secret name/ARN that stores the ChatBot API key.

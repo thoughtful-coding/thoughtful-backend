@@ -1,6 +1,7 @@
 import logging
 import typing
 
+from thoughtful_backend.dynamodb.first_solutions_table import FirstSolutionsTable
 from thoughtful_backend.dynamodb.learning_entries_table import LearningEntriesTable
 from thoughtful_backend.dynamodb.primm_submissions_table import PrimmSubmissionsTable
 from thoughtful_backend.dynamodb.user_permissions_table import UserPermissionsTable
@@ -24,6 +25,7 @@ from thoughtful_backend.utils.apig_utils import (
     get_user_id_from_event,
 )
 from thoughtful_backend.utils.aws_env_vars import (
+    get_first_solutions_table_name,
     get_learning_entries_table_name,
     get_primm_submissions_table_name,
     get_user_permissions_table_name,
@@ -48,11 +50,13 @@ class InstructorPortalApiHandler:
         user_progress_table: UserProgressTable,
         learning_entries_table: LearningEntriesTable,
         primm_submissions_table: PrimmSubmissionsTable,
+        first_solutions_table: FirstSolutionsTable,
     ):
         self.user_permissions_table = user_permissions_table
         self.user_progress_table = user_progress_table
         self.learning_entries_table = learning_entries_table
         self.primm_submissions_table = primm_submissions_table
+        self.first_solutions_table = first_solutions_table
 
     def _handle_get_instructor_students(self, instructor_id: InstructorId) -> dict:
         _LOGGER.info(f"Fetching permitted students for instructor_id: {instructor_id}")
@@ -236,8 +240,28 @@ class InstructorPortalApiHandler:
                                 "submissionDetails": sub.model_dump(by_alias=True),
                             }
                         )
+
+            elif assignment_type == "Testing":
+                # Query all first solutions for this section at once
+                solutions, _ = self.first_solutions_table.get_solutions_for_section(
+                    unit_id=unit_id,
+                    lesson_id=lesson_id,
+                    section_id=section_id,
+                )
+                # Filter to only include permitted students
+                for solution in solutions:
+                    student_id = solution.get("userId")
+                    if student_id in permitted_students:
+                        all_student_submissions.append(
+                            {
+                                "studentId": student_id,
+                                "submissionTimestamp": solution.get("submittedAt"),
+                                "submissionDetails": solution,
+                            }
+                        )
+
             else:
-                raise ValueError("Unhandled assignment type")
+                raise ValueError(f"Unhandled assignment type: {assignment_type}")
 
             # Sort all collected submissions from all students by timestamp, newest first
             all_student_submissions.sort(key=lambda x: x["submissionTimestamp"], reverse=True)
@@ -333,6 +357,7 @@ def instructor_portal_lambda_handler(event: dict, context: typing.Any) -> dict:
             user_progress_table=UserProgressTable(get_user_progress_table_name()),
             learning_entries_table=LearningEntriesTable(get_learning_entries_table_name()),
             primm_submissions_table=PrimmSubmissionsTable(get_primm_submissions_table_name()),
+            first_solutions_table=FirstSolutionsTable(get_first_solutions_table_name()),
         )
         return api_handler.handle(event)
 

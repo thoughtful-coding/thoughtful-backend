@@ -24,6 +24,7 @@ class SectionCompletionInputModel(BaseModel):
     lessonId: LessonId
     sectionId: SectionId
     attemptsBeforeSuccess: int = Field(..., ge=1)
+    firstCompletionContent: str | None = None
 
 
 class BatchCompletionsInputModel(BaseModel):

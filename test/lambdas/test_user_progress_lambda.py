@@ -38,11 +38,14 @@ def create_progress_event(
 
 def create_user_progress_api_handler(
     user_progress_table=Mock(),
+    first_solutions_table=Mock(),
 ) -> UserProgressApiHandler:
     handler = UserProgressApiHandler(
         user_progress_table=user_progress_table,
+        first_solutions_table=first_solutions_table,
     )
     assert handler.user_progress_table == user_progress_table
+    assert handler.first_solutions_table == first_solutions_table
     return handler
 
 
