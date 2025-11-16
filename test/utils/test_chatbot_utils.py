@@ -124,12 +124,10 @@ def test_chatbot_wrapper_gen_primm_feedback_prompt() -> None:
         code_snippet="for i in range(4)",
         prediction_prompt_text="What's it do?",
         user_prediction_text="it loops",
-        user_prediction_confidence=3,
         user_explanation_text="i was right",
         actual_output_summary="it went around",
     )
 
-    assert "**Student's Confidence:** High" in prompt
     assert "```python\nfor i in range(4)\n```" in prompt
 
 
@@ -163,7 +161,6 @@ def test_call_primm_feedback_api_normal_behavior(mock_post):
         code_snippet="for i in range(4):",
         prediction_prompt_text="What's it do?",
         user_prediction_text="it loops",
-        user_prediction_confidence=3,
         user_explanation_text="I was right",
         actual_output_summary="it went around",
     )
@@ -205,7 +202,6 @@ def test_call_primm_feedback_api_abnormal_behavior(mock_post):
         code_snippet="for i in range(4):",
         prediction_prompt_text="What's it do?",
         user_prediction_text="it loops",
-        user_prediction_confidence=3,
         user_explanation_text="I was right",
         actual_output_summary="it went around",
     )

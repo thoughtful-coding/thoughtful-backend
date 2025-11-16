@@ -336,7 +336,6 @@ def test_user_progress_api_handler_handle_get_10():
         sectionId="primm-print-analysis",
         timestampIso="2025-06-06T20:21:48.433152+00:00",
         userExplanationText="I was right.",
-        userPredictionConfidence=decimal.Decimal(3),
         userPredictionPromptText="Look closely",
         userPredictionText='It will print out "hello alex"',
     )
@@ -354,4 +353,3 @@ def test_user_progress_api_handler_handle_get_10():
     assert body_dict["lessonId"] == "l1"
     assert body_dict["sectionId"] == "s1"
     assert len(body_dict["submissions"]) == 1
-    assert body_dict["submissions"][0]["submissionDetails"]["userPredictionConfidence"] == 3

@@ -79,7 +79,6 @@ class PrimmFeedbackApiHandler:
                 code_snippet=request_data.code_snippet,
                 prediction_prompt_text=request_data.user_prediction_prompt_text,
                 user_prediction_text=request_data.user_prediction_text,
-                user_prediction_confidence=request_data.user_prediction_confidence,
                 user_explanation_text=request_data.user_explanation_text,
                 actual_output_summary=request_data.actual_output_summary,
             )

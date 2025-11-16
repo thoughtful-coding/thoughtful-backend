@@ -70,7 +70,6 @@ class PrimmSubmissionsTable:
             "codeSnippet": request_data.code_snippet,
             "userPredictionPromptText": request_data.user_prediction_prompt_text,
             "userPredictionText": request_data.user_prediction_text,
-            "userPredictionConfidence": request_data.user_prediction_confidence,
             "actualOutputSummary": request_data.actual_output_summary,
             "userExplanationText": request_data.user_explanation_text,
             # From PrimmEvaluationResponseModel (AI's evaluation)

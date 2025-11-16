@@ -53,7 +53,6 @@ def _create_sample_request_data(lesson_id="l1", section_id="s1", example_id="ex1
         codeSnippet="print('hello')",
         userPredictionPromptText="What happens?",
         userPredictionText="It prints hello.",
-        userPredictionConfidence=3,
         actualOutputSummary="hello",
         userExplanationText="It worked as expected.",
     )
@@ -95,7 +94,6 @@ def test_save_submission_successful(primm_submissions_table_instance: PrimmSubmi
     assert item["timestampIso"] == timestamp_iso
     assert item["codeSnippet"] == req_data.code_snippet
     assert item["userPredictionText"] == req_data.user_prediction_text
-    assert item["userPredictionConfidence"] == req_data.user_prediction_confidence
     assert item["userExplanationText"] == req_data.user_explanation_text
     assert item["aiPredictionAssessment"] == eval_data.ai_prediction_assessment
     assert item["aiExplanationAssessment"] == eval_data.ai_explanation_assessment

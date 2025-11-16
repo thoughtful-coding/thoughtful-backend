@@ -13,7 +13,6 @@ class PrimmEvaluationRequestModel(BaseModel):
     code_snippet: str = Field(..., alias="codeSnippet")
     user_prediction_prompt_text: str = Field(..., alias="userPredictionPromptText")
     user_prediction_text: str = Field(..., alias="userPredictionText")
-    user_prediction_confidence: int = Field(..., alias="userPredictionConfidence")
     user_explanation_text: str = Field(..., alias="userExplanationText")
     actual_output_summary: typing.Optional[str] = Field(None, alias="actualOutputSummary")
 
@@ -44,7 +43,6 @@ class StoredPrimmSubmissionItemModel(BaseModel):
     codeSnippet: str
     userPredictionPromptText: str
     userPredictionText: str
-    userPredictionConfidence: int  # Pydantic will handle Decimal -> int conversion
     actualOutputSummary: typing.Optional[str] = None
     userExplanationText: str
 

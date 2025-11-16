@@ -113,7 +113,6 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_3():
         "code_snippet": "for i in range",
         "user_prediction_prompt_text": "what's it do?",
         "user_prediction_text": "it loops",
-        "user_prediction_confidence": 3,
         "user_explanation_text": "I was right",
     }
     event = {

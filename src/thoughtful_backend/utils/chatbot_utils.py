@@ -139,8 +139,6 @@ Your task is to evaluate a student's analysis of a given Python code snippet. Th
 
 {user_prediction_text}
 
-**Student's Confidence:** {user_prediction_confidence_text}
-
 **Actual Code Output Summary (if any) as Observed by Student:**
 
 {actual_output_summary}
@@ -153,8 +151,7 @@ Your task is to evaluate a student's analysis of a given Python code snippet. Th
 
 - aiPredictionAssessment:
     Based on the code_snippet and prediction_prompt_text, evaluate the specificity, accuracy,
-    and relevance of the user_prediction_text. Consider their prediction_confidence in your tone
-    if providing textual feedback.
+    and relevance of the user_prediction_text.
 
     AssessmentLevel Rubric for Prediction:
         "achieves": Prediction is highly specific, accurate, directly addresses the prompt, and demonstrates clear foresight or understanding of code execution.
@@ -309,31 +306,19 @@ class ChatBotWrapper:
             _LOGGER.error(f"Error parsing API response: {e}. Raw data: {generated_dict}", exc_info=True)
             raise ValueError(f"Invalid or unexpected response structure from AI for PRIMM: {str(e)}")
 
-    def _confidence_to_text(self, confidence_level: int) -> str:
-        if confidence_level <= 1:
-            return "Low"
-        if confidence_level == 2:
-            return "Medium"
-        if confidence_level >= 3:
-            return "High"
-        return "Not Specified"
-
     def generate_primm_feedback_prompt(
         self,
         *,
         code_snippet: str,
         prediction_prompt_text: str,
         user_prediction_text: str,
-        user_prediction_confidence: int,
         user_explanation_text: str,
         actual_output_summary: typing.Optional[str],
     ) -> str:
-        user_confidence_text = self._confidence_to_text(user_prediction_confidence)
         return _PRIMM_EVALUATION_PROMPT_TEMPLATE.format(
             code_snippet=code_snippet,
             prediction_prompt_text=prediction_prompt_text,
             user_prediction_text=user_prediction_text,
-            user_prediction_confidence_text=user_confidence_text,
             user_explanation_text=user_explanation_text,
             actual_output_summary=actual_output_summary or "Not provided.",
         )
@@ -345,7 +330,6 @@ class ChatBotWrapper:
         code_snippet: str,
         prediction_prompt_text: str,
         user_prediction_text: str,
-        user_prediction_confidence: int,
         user_explanation_text: str,
         actual_output_summary: typing.Optional[str],
     ) -> PrimmEvaluationResponseModel:
@@ -353,7 +337,6 @@ class ChatBotWrapper:
             code_snippet=code_snippet,
             prediction_prompt_text=prediction_prompt_text,
             user_prediction_text=user_prediction_text,
-            user_prediction_confidence=user_prediction_confidence,
             user_explanation_text=user_explanation_text,
             actual_output_summary=actual_output_summary,
         )
