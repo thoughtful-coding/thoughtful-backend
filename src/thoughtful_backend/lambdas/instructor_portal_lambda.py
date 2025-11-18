@@ -9,8 +9,12 @@ from thoughtful_backend.dynamodb.user_progress_table import UserProgressTable
 from thoughtful_backend.models.instructor_portal_models import (
     ClassUnitProgressResponseModel,
     InstructorStudentInfoModel,
+    LessonProgressProfileModel,
     ListOfInstructorStudentsResponseModel,
+    SectionStatusItemModel,
+    StudentDetailedProgressResponseModel,
     StudentUnitCompletionDataModel,
+    UnitProgressProfileModel,
 )
 from thoughtful_backend.utils.apig_utils import (
     ErrorCode,
@@ -183,6 +187,243 @@ class InstructorPortalApiHandler:
             )
             return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
+    def _handle_get_student_primm_submissions(
+        self,
+        instructor_id: InstructorId,
+        student_id: UserId,
+        event: dict,
+    ) -> dict:
+        """
+        Handles an instructor's request to view a specific student's PRIMM submissions.
+        """
+        _LOGGER.info(f"Instructor {instructor_id} requesting PRIMM submissions for student {student_id}")
+
+        # 1. Permission Check
+        has_permission = self.user_permissions_table.check_permission(
+            granter_user_id=student_id,
+            grantee_user_id=instructor_id,
+            permission_type="VIEW_STUDENT_DATA_FULL",
+        )
+        if not has_permission:
+            _LOGGER.warning(f"Forbidden: Instructor {instructor_id} lacks permission for student {student_id}.")
+            return create_error_response(ErrorCode.AUTHORIZATION_FAILED, event=event)
+
+        try:
+            query_params = get_query_string_parameters(event)
+
+            submissions, next_last_key = self.primm_submissions_table.get_submissions_by_student(
+                user_id=student_id,
+                lesson_id_filter=None,
+                section_id_filter=None,
+                primm_example_id_filter=None,
+                limit=get_pagination_limit(query_params),
+                last_evaluated_key=get_last_evaluated_key(query_params),
+            )
+
+            response_payload = {
+                "submissions": [item.model_dump(by_alias=True, exclude_none=True) for item in submissions],
+                "lastEvaluatedKey": next_last_key,
+            }
+            return format_lambda_response(200, response_payload)
+
+        except Exception as e:
+            _LOGGER.error(
+                f"Error fetching PRIMM submissions for student {student_id}: {e}",
+                exc_info=True,
+            )
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
+
+    def _handle_get_student_detailed_progress(
+        self,
+        instructor_id: InstructorId,
+        student_id: UserId,
+        event: dict,
+    ) -> dict:
+        """
+        Handles an instructor's request to view a specific student's detailed progress
+        across all units, lessons, and sections with submission details.
+        """
+        _LOGGER.info(f"Instructor {instructor_id} requesting detailed progress for student {student_id}")
+
+        # 1. Permission Check
+        has_permission = self.user_permissions_table.check_permission(
+            granter_user_id=student_id,
+            grantee_user_id=instructor_id,
+            permission_type="VIEW_STUDENT_DATA_FULL",
+        )
+        if not has_permission:
+            _LOGGER.warning(f"Forbidden: Instructor {instructor_id} lacks permission for student {student_id}.")
+            return create_error_response(ErrorCode.AUTHORIZATION_FAILED, event=event)
+
+        try:
+            # 2. Get all user progress for this student
+            all_progress = self.user_progress_table.get_all_unit_progress_for_user(user_id=student_id)
+
+            if not all_progress:
+                # No progress for this student
+                response_model = StudentDetailedProgressResponseModel(
+                    student_id=student_id,
+                    student_name=None,
+                    profile=[],
+                )
+                return format_lambda_response(200, response_model.model_dump(by_alias=True, exclude_none=True))
+
+            # 3. Fetch all submissions once (optimized approach)
+            # Get all reflection submissions for this student
+            all_reflections, _ = self.learning_entries_table.get_entries_for_user(
+                user_id=student_id,
+                filter_mode="all",
+            )
+
+            # Get all PRIMM submissions for this student
+            all_primm, _ = self.primm_submissions_table.get_submissions_by_student(
+                user_id=student_id,
+                lesson_id_filter=None,
+                section_id_filter=None,
+                primm_example_id_filter=None,
+            )
+
+            # 4. Build lookup maps for efficient access
+            # Map: (lessonId, sectionId) -> list of reflection versions
+            reflections_by_section: dict[tuple[LessonId, SectionId], list] = {}
+            for reflection in all_reflections:
+                key = (reflection.lesson_id, reflection.section_id)
+                if key not in reflections_by_section:
+                    reflections_by_section[key] = []
+                reflections_by_section[key].append(reflection)
+
+            # Map: (lessonId, sectionId) -> list of PRIMM submissions
+            primm_by_section: dict[tuple[LessonId, SectionId], list] = {}
+            for primm in all_primm:
+                key = (primm.lessonId, primm.sectionId)
+                if key not in primm_by_section:
+                    primm_by_section[key] = []
+                primm_by_section[key].append(primm)
+
+            # 5. Build the response structure by iterating through progress
+            profile_list: list[UnitProgressProfileModel] = []
+
+            for progress_item in all_progress:
+                unit_id = progress_item.unitId
+                lessons_list: list[LessonProgressProfileModel] = []
+
+                for lesson_id, sections_completion in progress_item.completion.items():
+                    sections_list: list[SectionStatusItemModel] = []
+
+                    for section_id, completion_detail in sections_completion.items():
+                        section_key = (lesson_id, section_id)
+
+                        # Check for Reflection submissions
+                        if section_key in reflections_by_section:
+                            reflection_versions = reflections_by_section[section_key]
+                            # Sort by creation time, newest first
+                            reflection_versions_sorted = sorted(
+                                reflection_versions, key=lambda x: x.createdAt, reverse=True
+                            )
+                            sections_list.append(
+                                SectionStatusItemModel(
+                                    section_id=section_id,
+                                    section_title="",  # Frontend will populate
+                                    section_kind="Reflection",
+                                    status="submitted",
+                                    submission_timestamp=reflection_versions_sorted[0].createdAt,
+                                    submission_details=[
+                                        v.model_dump(by_alias=True) for v in reflection_versions_sorted
+                                    ],
+                                )
+                            )
+                            continue
+
+                        # Check for PRIMM submissions
+                        if section_key in primm_by_section:
+                            primm_submissions = primm_by_section[section_key]
+                            # Sort by timestamp, newest first
+                            primm_submissions_sorted = sorted(
+                                primm_submissions, key=lambda x: x.timestampIso, reverse=True
+                            )
+                            sections_list.append(
+                                SectionStatusItemModel(
+                                    section_id=section_id,
+                                    section_title="",  # Frontend will populate
+                                    section_kind="PRIMM",
+                                    status="submitted",
+                                    submission_timestamp=primm_submissions_sorted[0].timestampIso,
+                                    submission_details=[s.model_dump(by_alias=True) for s in primm_submissions_sorted],
+                                )
+                            )
+                            continue
+
+                        # Check for Testing submissions
+                        # Query for this specific section
+                        testing_solutions, _ = self.first_solutions_table.get_solutions_for_section(
+                            unit_id=unit_id,
+                            lesson_id=lesson_id,
+                            section_id=section_id,
+                        )
+                        # Find this student's solution
+                        student_solution = next(
+                            (s for s in testing_solutions if s.get("userId") == student_id),
+                            None,
+                        )
+
+                        if student_solution:
+                            sections_list.append(
+                                SectionStatusItemModel(
+                                    section_id=section_id,
+                                    section_title="",  # Frontend will populate
+                                    section_kind="Testing",
+                                    status="submitted",
+                                    submission_timestamp=student_solution.get("submittedAt"),
+                                    submission_details=student_solution,
+                                )
+                            )
+                            continue
+
+                        # No submission, just completed
+                        if completion_detail.completed_at:
+                            sections_list.append(
+                                SectionStatusItemModel(
+                                    section_id=section_id,
+                                    section_title="",  # Frontend will populate
+                                    section_kind="",  # Unknown type
+                                    status="completed",
+                                    submission_timestamp=completion_detail.completed_at,
+                                    submission_details=None,
+                                )
+                            )
+
+                    if sections_list:
+                        lessons_list.append(
+                            LessonProgressProfileModel(
+                                lesson_id=lesson_id,
+                                lesson_title="",  # Frontend will populate
+                                sections=sections_list,
+                            )
+                        )
+
+                if lessons_list:
+                    profile_list.append(
+                        UnitProgressProfileModel(
+                            unit_id=unit_id,
+                            unit_title="",  # Frontend will populate
+                            lessons=lessons_list,
+                        )
+                    )
+
+            response_model = StudentDetailedProgressResponseModel(
+                student_id=student_id,
+                student_name=None,  # Not available in current data
+                profile=profile_list,
+            )
+            return format_lambda_response(200, response_model.model_dump(by_alias=True, exclude_none=True))
+
+        except Exception as e:
+            _LOGGER.error(
+                f"Error fetching detailed progress for student {student_id}: {e}",
+                exc_info=True,
+            )
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
+
     def _handle_get_assignment_submissions(self, instructor_id: InstructorId, event: dict) -> dict:
         _LOGGER.info(f"Instructor {instructor_id} requesting submissions for a specific assignment.")
 
@@ -224,13 +465,13 @@ class InstructorPortalApiHandler:
                             }
                         )
 
-            elif assignment_type == "PRIMM" and primm_example_id:
+            elif assignment_type == "PRIMM":
                 for student_id in permitted_students:
                     primm_submissions, _ = self.primm_submissions_table.get_submissions_by_student(
                         user_id=student_id,
                         lesson_id_filter=lesson_id,
                         section_id_filter=section_id,
-                        primm_example_id_filter=primm_example_id,
+                        primm_example_id_filter=primm_example_id,  # Optional - filters if provided
                     )
                     for sub in primm_submissions:
                         all_student_submissions.append(
@@ -324,9 +565,39 @@ class InstructorPortalApiHandler:
                     student_id = UserId(path_parts[2])
                     return self._handle_get_student_learning_entries(instructor_id, student_id, event)
                 else:
-                    _LOGGER.warning(f"Malformed path for class unit progress: {path}")
+                    _LOGGER.warning(f"Malformed path for learning entries: {path}")
                     return create_error_response(
                         ErrorCode.VALIDATION_ERROR, "Malformed URL for finalized learning entries.", event=event
+                    )
+
+            elif (
+                http_method == "GET"
+                and path.startswith("/instructor/students/")
+                and path.endswith("/primm-submissions")
+            ):
+                # Path: /instructor/students/{studentId}/primm-submissions
+                if len(path_parts) == 4:
+                    student_id = UserId(path_parts[2])
+                    return self._handle_get_student_primm_submissions(instructor_id, student_id, event)
+                else:
+                    _LOGGER.warning(f"Malformed path for PRIMM submissions: {path}")
+                    return create_error_response(
+                        ErrorCode.VALIDATION_ERROR, "Malformed URL for PRIMM submissions.", event=event
+                    )
+
+            elif (
+                http_method == "GET"
+                and path.startswith("/instructor/students/")
+                and path.endswith("/detailed-progress")
+            ):
+                # Path: /instructor/students/{studentId}/detailed-progress
+                if len(path_parts) == 4:
+                    student_id = UserId(path_parts[2])
+                    return self._handle_get_student_detailed_progress(instructor_id, student_id, event)
+                else:
+                    _LOGGER.warning(f"Malformed path for detailed progress: {path}")
+                    return create_error_response(
+                        ErrorCode.VALIDATION_ERROR, "Malformed URL for detailed progress.", event=event
                     )
 
             elif http_method == "GET" and len(path_parts) == 8 and path.endswith("/assignment-submissions"):

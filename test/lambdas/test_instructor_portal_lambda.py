@@ -353,3 +353,231 @@ def test_user_progress_api_handler_handle_get_10():
     assert body_dict["lessonId"] == "l1"
     assert body_dict["sectionId"] == "s1"
     assert len(body_dict["submissions"]) == 1
+
+
+def test_user_progress_api_handler_handle_get_11():
+    """
+    Test getting PRIMM submissions for a student without permission (403)
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/primm-submissions",
+            }
+        }
+    }
+    add_authorizer_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = False
+    ret = create_instructor_portal_api_handler(user_permissions_table=user_permissions_table)
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 403
+
+
+def test_user_progress_api_handler_handle_get_12():
+    """
+    Test getting PRIMM submissions for a student with permission
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/primm-submissions",
+            }
+        }
+    }
+    add_authorizer_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = True
+
+    mock_submission = StoredPrimmSubmissionItemModel(
+        userId="s1",
+        submissionCompositeKey="lesson1#section1#example1#2025-01-01T00:00:00Z",
+        lessonId="lesson1",
+        sectionId="section1",
+        primmExampleId="example1",
+        timestampIso="2025-01-01T00:00:00Z",
+        codeSnippet="print('hello')",
+        userPredictionPromptText="What will this print?",
+        userPredictionText="hello",
+        userExplanationText="This code prints hello",
+        aiPredictionAssessment="achieves",
+        aiExplanationAssessment=None,
+        aiOverallComment="Good job",
+        createdAt="2025-01-01T00:00:00Z",
+    )
+
+    primm_submissions_table = Mock()
+    primm_submissions_table.get_submissions_by_student.return_value = ([mock_submission], None)
+
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        primm_submissions_table=primm_submissions_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert "submissions" in body_dict
+    assert len(body_dict["submissions"]) == 1
+    assert body_dict["submissions"][0]["userId"] == "s1"
+    assert body_dict["lastEvaluatedKey"] is None
+
+
+def test_user_progress_api_handler_handle_get_13():
+    """
+    Test getting PRIMM submissions for a student with no submissions
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/primm-submissions",
+            }
+        }
+    }
+    add_authorizer_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = True
+
+    primm_submissions_table = Mock()
+    primm_submissions_table.get_submissions_by_student.return_value = ([], None)
+
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        primm_submissions_table=primm_submissions_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict["submissions"] == []
+    assert body_dict["lastEvaluatedKey"] is None
+
+
+def test_user_progress_api_handler_handle_get_14():
+    """
+    Test getting detailed progress for a student without permission (403)
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/detailed-progress",
+            }
+        }
+    }
+    add_authorizer_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = False
+    ret = create_instructor_portal_api_handler(user_permissions_table=user_permissions_table)
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 403
+
+
+def test_user_progress_api_handler_handle_get_15():
+    """
+    Test getting detailed progress for a student with no progress
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/detailed-progress",
+            }
+        }
+    }
+    add_authorizer_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = True
+
+    user_progress_table = Mock()
+    user_progress_table.get_all_unit_progress_for_user.return_value = []
+
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        user_progress_table=user_progress_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict["studentId"] == "s1"
+    assert body_dict["profile"] == []
+    # studentName is excluded because it's None (exclude_none=True)
+    assert "studentName" not in body_dict
+
+
+def test_user_progress_api_handler_handle_get_16():
+    """
+    Test getting detailed progress for a student with progress but no submissions
+    """
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "GET",
+                "path": "/instructor/students/s1/detailed-progress",
+            }
+        }
+    }
+    add_authorizer_info(event, "e")
+
+    user_permissions_table = Mock()
+    user_permissions_table.check_permission.return_value = True
+
+    # Mock progress data
+    from thoughtful_backend.models.user_progress_models import UserUnitProgressModel, SectionCompletionDetail
+
+    mock_progress = UserUnitProgressModel(
+        userId="s1",
+        unitId="unit1",
+        completion={
+            "lesson1": {
+                "section1": SectionCompletionDetail(completed_at="2025-01-01T00:00:00Z", attempts_before_success=1)
+            },
+        },
+    )
+
+    user_progress_table = Mock()
+    user_progress_table.get_all_unit_progress_for_user.return_value = [mock_progress]
+
+    learning_entries_table = Mock()
+    learning_entries_table.get_entries_for_user.return_value = ([], None)
+
+    primm_submissions_table = Mock()
+    primm_submissions_table.get_submissions_by_student.return_value = ([], None)
+
+    first_solutions_table = Mock()
+    first_solutions_table.get_solutions_for_section.return_value = ([], None)
+
+    ret = create_instructor_portal_api_handler(
+        user_permissions_table=user_permissions_table,
+        user_progress_table=user_progress_table,
+        learning_entries_table=learning_entries_table,
+        primm_submissions_table=primm_submissions_table,
+        first_solutions_table=first_solutions_table,
+    )
+    response = ret.handle(event)
+
+    assert response["statusCode"] == 200
+    body_dict = json.loads(response["body"])
+    assert body_dict["studentId"] == "s1"
+    assert "profile" in body_dict
+    assert len(body_dict["profile"]) == 1
+    assert body_dict["profile"][0]["unitId"] == "unit1"
+    assert len(body_dict["profile"][0]["lessons"]) == 1
+    assert body_dict["profile"][0]["lessons"][0]["lessonId"] == "lesson1"
+    assert len(body_dict["profile"][0]["lessons"][0]["sections"]) == 1
+    section = body_dict["profile"][0]["lessons"][0]["sections"][0]
+    assert section["sectionId"] == "section1"
+    assert section["status"] == "completed"
+    # submissionDetails is excluded because it's None (exclude_none=True)
+    assert "submissionDetails" not in section

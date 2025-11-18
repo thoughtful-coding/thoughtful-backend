@@ -80,3 +80,46 @@ class StudentUnitProgressResponseModel_ClientView(BaseModel):  # What client com
     class Config:
         populate_by_name = True
         allow_population_by_field_name = False
+
+
+class SectionStatusItemModel(BaseModel):
+    section_id: SectionId = Field(..., alias="sectionId")
+    section_title: str = Field(..., alias="sectionTitle")
+    section_kind: str = Field(..., alias="sectionKind")
+    status: typing.Literal["completed", "submitted", "not_started"] = Field(..., alias="status")
+    submission_timestamp: typing.Optional[str] = Field(None, alias="submissionTimestamp")
+    submission_details: typing.Optional[typing.Any] = Field(None, alias="submissionDetails")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = False
+
+
+class LessonProgressProfileModel(BaseModel):
+    lesson_id: LessonId = Field(..., alias="lessonId")
+    lesson_title: str = Field(..., alias="lessonTitle")
+    sections: list[SectionStatusItemModel] = Field(..., alias="sections")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = False
+
+
+class UnitProgressProfileModel(BaseModel):
+    unit_id: UnitId = Field(..., alias="unitId")
+    unit_title: str = Field(..., alias="unitTitle")
+    lessons: list[LessonProgressProfileModel] = Field(..., alias="lessons")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = False
+
+
+class StudentDetailedProgressResponseModel(BaseModel):
+    student_id: UserId = Field(..., alias="studentId")
+    student_name: typing.Optional[str] = Field(None, alias="studentName")
+    profile: list[UnitProgressProfileModel] = Field(..., alias="profile")
+
+    class Config:
+        populate_by_name = True
+        allow_population_by_field_name = False
