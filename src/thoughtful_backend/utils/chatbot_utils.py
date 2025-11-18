@@ -41,6 +41,8 @@ learning and don't provide feedback that is beyond the level of the given exampl
 
 {explanation}
 
+{extra_context_section}
+
 ### Rubric for Assessment Levels
 
 | Objective | Requirements/Specifications | Achieves | Mostly | Developing | Insufficient |
@@ -88,6 +90,8 @@ should not go too far beyond the scope of the topic they are trying to explain.
 **Student's Explanation:**
 
 {explanation}
+
+{extra_context_section}
 
 ### Rubric for Assessment Levels
 
@@ -269,13 +273,21 @@ class ChatBotWrapper:
         code: str,
         is_code_predefined: bool,
         explanation: str,
+        extra_context: typing.Optional[str] = None,
     ) -> str:
+        # Format the extra context section if provided
+        extra_context_section = ""
+        if extra_context:
+            extra_context_section = f"### Additional Context for Evaluation\n\n{extra_context}"
+
         if is_code_predefined:
             return _PREDFINED_CODE_REFLECTION_FEEDBACK_PROMPT_TEMPLATE.format(
-                topic=topic, code=code, explanation=explanation
+                topic=topic, code=code, explanation=explanation, extra_context_section=extra_context_section
             )
         else:
-            return _REFLECTION_FEEDBACK_PROMPT_TEMPLATE.format(topic=topic, code=code, explanation=explanation)
+            return _REFLECTION_FEEDBACK_PROMPT_TEMPLATE.format(
+                topic=topic, code=code, explanation=explanation, extra_context_section=extra_context_section
+            )
 
     def call_reflection_api(
         self,
@@ -286,6 +298,7 @@ class ChatBotWrapper:
         code: str,
         is_code_predefined: bool,
         explanation: str,
+        extra_context: typing.Optional[str] = None,
     ) -> ChatBotFeedback:
         prompt = self.generate_reflection_feedback_prompt(
             topic=topic,
@@ -293,6 +306,7 @@ class ChatBotWrapper:
             code=code,
             is_code_predefined=is_code_predefined,
             explanation=explanation,
+            extra_context=extra_context,
         )
         generated_dict = self._call_google_generative_api(
             chatbot_api_key=chatbot_api_key,

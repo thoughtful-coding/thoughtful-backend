@@ -118,6 +118,69 @@ def test_call_reflection_feedback_api_abnormal_behavior(mock_post):
     )
 
 
+def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_predefined() -> None:
+    """
+    Test prompt with extra context where student is given predefined code
+    """
+    cbw = ChatBotWrapper()
+    prompt = cbw.generate_reflection_feedback_prompt(
+        topic="For Loops",
+        is_topic_predefined=False,
+        code="for i in range",
+        is_code_predefined=True,
+        explanation="Around",
+        extra_context="Focus on code efficiency and time complexity.",
+    )
+
+    assert "**Topic of Student's Analysis:** For Loops" in prompt
+    assert "**Code Student Was Given to Analyze:**" in prompt
+    assert "```python\nfor i in range\n```" in prompt
+    assert "**Student's Explanation:**\n\nAround\n" in prompt
+    assert "### Additional Context for Evaluation" in prompt
+    assert "Focus on code efficiency and time complexity." in prompt
+
+
+def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_student_code() -> None:
+    """
+    Test prompt with extra context where student writes their own code
+    """
+    cbw = ChatBotWrapper()
+    prompt = cbw.generate_reflection_feedback_prompt(
+        topic="While Loops",
+        is_topic_predefined=False,
+        code="while True: break",
+        is_code_predefined=False,
+        explanation="This creates an infinite loop and breaks immediately",
+        extra_context="Pay special attention to edge cases and readability.",
+    )
+
+    assert "**Topic:** While Loops" in prompt
+    assert "```python\nwhile True: break\n```" in prompt
+    assert "**Student's Explanation:**\n\nThis creates an infinite loop and breaks immediately\n" in prompt
+    assert "### Additional Context for Evaluation" in prompt
+    assert "Pay special attention to edge cases and readability." in prompt
+
+
+def test_chatbot_wrapper_gen_reflection_feedback_prompt_without_extra_context() -> None:
+    """
+    Test that prompts work correctly when extra_context is not provided (backward compatibility)
+    """
+    cbw = ChatBotWrapper()
+    prompt = cbw.generate_reflection_feedback_prompt(
+        topic="For Loops",
+        is_topic_predefined=False,
+        code="for i in range",
+        is_code_predefined=False,
+        explanation="Around",
+    )
+
+    assert "**Topic:** For Loops" in prompt
+    assert "```python\nfor i in range\n```" in prompt
+    assert "**Student's Explanation:**\n\nAround\n" in prompt
+    # Should not contain extra context section
+    assert "### Additional Context for Evaluation" not in prompt
+
+
 def test_chatbot_wrapper_gen_primm_feedback_prompt() -> None:
     cbw = ChatBotWrapper()
     prompt = cbw.generate_primm_feedback_prompt(

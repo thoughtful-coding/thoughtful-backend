@@ -26,6 +26,7 @@ class ReflectionInteractionInputModel(pydantic.BaseModel):
     userExplanation: str
     isFinal: bool = False
     sourceVersionId: typing.Optional[str] = None
+    extraContext: typing.Optional[str] = None
 
     class Config:
         # Pydantic V2: from_attributes = True (if creating from ORM models, not relevant here)
@@ -51,6 +52,7 @@ class ReflectionVersionItemModel(pydantic.BaseModel):
     isFinal: bool
     sourceVersionId: typing.Optional[str] = None
     finalEntryCreatedAt: typing.Optional[IsoTimestamp] = None
+    extraContext: typing.Optional[str] = None
 
     @pydantic.field_validator("createdAt", "finalEntryCreatedAt", mode="before")
     @classmethod

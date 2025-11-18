@@ -78,6 +78,7 @@ class LearningEntriesApiHandler:
                 code=interaction_input.userCode,
                 is_code_predefined=interaction_input.isUserCodePredefined,
                 explanation=interaction_input.userExplanation,
+                extra_context=interaction_input.extraContext,
             )
 
         timestamp_dt = datetime.datetime.now(datetime.timezone.utc)
@@ -97,6 +98,7 @@ class LearningEntriesApiHandler:
             "isFinal": False,
             "sourceVersionId": None,  # Drafts usually don't have a source this way
             "finalEntryCreatedAt": None,
+            "extraContext": interaction_input.extraContext,
         }
 
         # Create and validate Pydantic model for DDB item
@@ -158,6 +160,7 @@ class LearningEntriesApiHandler:
             "isFinal": True,
             "sourceVersionId": actual_source_version_id,  # Link to the draft
             "finalEntryCreatedAt": timestamp_dt.isoformat().replace("+00:00", "Z"),  # For GSI
+            "extraContext": interaction_input.extraContext,
         }
 
         final_reflection_ddb_item = ReflectionVersionItemModel(**final_item_ddb_data)

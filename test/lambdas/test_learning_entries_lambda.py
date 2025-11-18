@@ -319,3 +319,71 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
     body_dict = json.loads(response["body"])
     assert body_dict["aiFeedback"] == "looks good"
     assert body_dict["aiAssessment"] == "mostly"
+
+
+def test_learning_entries_api_handler_handle_post_reflection_with_extra_context():
+    """
+    Handle proper input with extraContext field
+    """
+    reflection = {
+        "userTopic": "Things to think",
+        "isUserTopicPredefined": "False",
+        "userCode": "for i in range",
+        "isUserCodePredefined": "False",
+        "userExplanation": "goes around",
+        "extraContext": "Focus on code efficiency and time complexity.",
+    }
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "POST",
+                "path": "/reflections/l1/sections/s1",
+            }
+        },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
+        "body": json.dumps(reflection),
+    }
+    add_authorizer_info(event, "e")
+
+    learning_entries_table = Mock()
+    learning_entries_table.save_item.return_value = ReflectionVersionItemModel(
+        versionId="a",
+        userId="e",
+        lessonId="l1",
+        sectionId="s1",
+        userTopic="For loops",
+        userCode="for i in range",
+        userExplanation="round and round",
+        createdAt="2025-05-25",
+        aiFeedback="looks good",
+        aiAssessment="mostly",
+        isFinal=False,
+        extraContext="Focus on code efficiency and time complexity.",
+    )
+    throttle_table = Mock()
+    mock_context_manager = MagicMock()
+    mock_context_manager.__enter__.return_value = None
+    mock_context_manager.__exit__.return_value = None
+    throttle_table.throttle_action.return_value = mock_context_manager
+
+    secrets_manager = Mock()
+    chatbot_wrapper = Mock()
+    chatbot_wrapper.call_reflection_api.return_value = ChatBotFeedback("looks good", "mostly")
+
+    leah = create_learning_entries_api_handler(
+        learning_entries_table=learning_entries_table,
+        throttle_table=throttle_table,
+        chatbot_wrapper=chatbot_wrapper,
+    )
+    response = leah.handle(event)
+
+    assert response["statusCode"] == 201
+    body_dict = json.loads(response["body"])
+    assert body_dict["aiFeedback"] == "looks good"
+    assert body_dict["aiAssessment"] == "mostly"
+    assert body_dict["extraContext"] == "Focus on code efficiency and time complexity."
+
+    # Verify that the chatbot wrapper was called with the extra context
+    chatbot_wrapper.call_reflection_api.assert_called_once()
+    call_args = chatbot_wrapper.call_reflection_api.call_args
+    assert call_args.kwargs["extra_context"] == "Focus on code efficiency and time complexity."
