@@ -387,3 +387,162 @@ def test_learning_entries_api_handler_handle_post_reflection_with_extra_context(
     chatbot_wrapper.call_reflection_api.assert_called_once()
     call_args = chatbot_wrapper.call_reflection_api.call_args
     assert call_args.kwargs["extra_context"] == "Focus on code efficiency and time complexity."
+
+
+def test_learning_entries_api_handler_input_validation_length():
+    """
+    Test that input validation blocks overly long explanations.
+    Validation now happens in ChatBotWrapper.call_reflection_api().
+    """
+    reflection = {
+        "userTopic": "For loops",
+        "isUserTopicPredefined": "False",
+        "userCode": "for i in range(10): print(i)",
+        "isUserCodePredefined": "False",
+        "userExplanation": "A" * 3000,  # Way over 2000 char limit
+    }
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "POST",
+                "path": "/reflections/l1/sections/s1",
+            }
+        },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
+        "body": json.dumps(reflection),
+    }
+    add_authorizer_info(event, "e")
+
+    # Set up throttle_table mock to support context manager
+    throttle_table = Mock()
+    mock_context_manager = MagicMock()
+    mock_context_manager.__enter__.return_value = None
+    mock_context_manager.__exit__.return_value = None
+    throttle_table.throttle_action.return_value = mock_context_manager
+
+    # ChatBotWrapper will raise SuspiciousInputError due to excessive length
+    chatbot_wrapper = Mock()
+    from thoughtful_backend.utils.input_validator import SuspiciousInputError
+
+    chatbot_wrapper.call_reflection_api.side_effect = SuspiciousInputError(
+        "explanation exceeds maximum length of 2000 characters"
+    )
+
+    metrics_manager = Mock()
+    leah = create_learning_entries_api_handler(
+        throttle_table=throttle_table, chatbot_wrapper=chatbot_wrapper, metrics_manager=metrics_manager
+    )
+    response = leah.handle(event)
+
+    assert response["statusCode"] == 400
+    body_dict = json.loads(response["body"])
+    assert "exceeds maximum length" in body_dict["message"]
+
+    # Verify metric was emitted
+    metrics_manager.put_metric.assert_called_with("InputValidationFailed", 1)
+
+
+def test_learning_entries_api_handler_input_validation_headers():
+    """
+    Test that input validation blocks too many markdown headers.
+    Validation now happens in ChatBotWrapper.call_reflection_api().
+    """
+    reflection = {
+        "userTopic": "For loops",
+        "isUserTopicPredefined": "False",
+        "userCode": "for i in range(10): print(i)",
+        "isUserCodePredefined": "False",
+        "userExplanation": "### 1\n### 2\n### 3\n### 4\n### 5",  # Too many headers
+    }
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "POST",
+                "path": "/reflections/l1/sections/s1",
+            }
+        },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
+        "body": json.dumps(reflection),
+    }
+    add_authorizer_info(event, "e")
+
+    # Set up throttle_table mock to support context manager
+    throttle_table = Mock()
+    mock_context_manager = MagicMock()
+    mock_context_manager.__enter__.return_value = None
+    mock_context_manager.__exit__.return_value = None
+    throttle_table.throttle_action.return_value = mock_context_manager
+
+    # ChatBotWrapper will raise SuspiciousInputError due to excessive headers
+    chatbot_wrapper = Mock()
+    from thoughtful_backend.utils.input_validator import SuspiciousInputError
+
+    chatbot_wrapper.call_reflection_api.side_effect = SuspiciousInputError(
+        "explanation contains too many section headers"
+    )
+
+    metrics_manager = Mock()
+    leah = create_learning_entries_api_handler(
+        throttle_table=throttle_table, chatbot_wrapper=chatbot_wrapper, metrics_manager=metrics_manager
+    )
+    response = leah.handle(event)
+
+    assert response["statusCode"] == 400
+    body_dict = json.loads(response["body"])
+    assert "too many section headers" in body_dict["message"]
+
+    # Verify metric was emitted
+    metrics_manager.put_metric.assert_called_with("InputValidationFailed", 1)
+
+
+def test_learning_entries_api_handler_input_validation_special_chars():
+    """
+    Test that input validation blocks excessive consecutive special characters.
+    Validation now happens in ChatBotWrapper.call_reflection_api().
+    """
+    reflection = {
+        "userTopic": "For loops",
+        "isUserTopicPredefined": "False",
+        "userCode": "for i in range(10): print(i)",
+        "isUserCodePredefined": "False",
+        "userExplanation": "This is @@@@@@@@@@@@@ suspicious",  # Too many consecutive special chars
+    }
+    event = {
+        "requestContext": {
+            "http": {
+                "method": "POST",
+                "path": "/reflections/l1/sections/s1",
+            }
+        },
+        "pathParameters": {"lessonId": "l1", "sectionId": "s1"},
+        "body": json.dumps(reflection),
+    }
+    add_authorizer_info(event, "e")
+
+    # Set up throttle_table mock to support context manager
+    throttle_table = Mock()
+    mock_context_manager = MagicMock()
+    mock_context_manager.__enter__.return_value = None
+    mock_context_manager.__exit__.return_value = None
+    throttle_table.throttle_action.return_value = mock_context_manager
+
+    # ChatBotWrapper will raise SuspiciousInputError due to unusual character sequences
+    chatbot_wrapper = Mock()
+    from thoughtful_backend.utils.input_validator import SuspiciousInputError
+
+    chatbot_wrapper.call_reflection_api.side_effect = SuspiciousInputError(
+        "explanation contains unusual character sequences"
+    )
+
+    metrics_manager = Mock()
+    leah = create_learning_entries_api_handler(
+        throttle_table=throttle_table, chatbot_wrapper=chatbot_wrapper, metrics_manager=metrics_manager
+    )
+    response = leah.handle(event)
+
+    assert response["statusCode"] == 400
+    body_dict = json.loads(response["body"])
+    assert "unusual character sequences" in body_dict["message"]
+
+    # Verify metric was emitted
+    metrics_manager.put_metric.assert_called_with("InputValidationFailed", 1)

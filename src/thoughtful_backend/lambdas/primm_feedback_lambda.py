@@ -29,6 +29,7 @@ from thoughtful_backend.utils.aws_env_vars import (
 )
 from thoughtful_backend.utils.base_types import UserId
 from thoughtful_backend.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
+from thoughtful_backend.utils.input_validator import SuspiciousInputError
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -112,6 +113,10 @@ class PrimmFeedbackApiHandler:
                 _LOGGER.warning(f"Unsupported HTTP method for /primm-feedback: {http_method}")
                 return create_error_response(ErrorCode.METHOD_NOT_ALLOWED, event=event)
 
+        except SuspiciousInputError as se:
+            _LOGGER.warning(f"Input validation failed for user {user_id}: {str(se)}", exc_info=False)
+            self.metrics_manager.put_metric("InputValidationFailed", 1)
+            return create_error_response(ErrorCode.VALIDATION_ERROR, str(se), event=event)
         except ThrottleRateLimitExceededException as te:
             _LOGGER.warning(f"Throttling limit hit for PRIMM feedback (user {user_id}): {te.limit_type} - {te.message}")
             self.metrics_manager.put_metric("ThrottledRequest", 1)

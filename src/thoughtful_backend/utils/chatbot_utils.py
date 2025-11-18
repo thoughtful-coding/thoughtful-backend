@@ -7,6 +7,7 @@ import requests
 
 from thoughtful_backend.models.learning_entry_models import ChatBotFeedback
 from thoughtful_backend.models.primm_feedback_models import PrimmEvaluationResponseModel
+from thoughtful_backend.utils.input_validator import InputValidator
 
 _LOGGER = logging.getLogger()
 _LOGGER.setLevel(logging.INFO)
@@ -200,8 +201,27 @@ greetings, or conversational filler before or after the JSON.
 
 
 class ChatBotWrapper:
+    # Maximum allowed length for AI-generated feedback
+    MAX_FEEDBACK_LENGTH = 500
+
     def __init__(self) -> None:
         pass
+
+    @classmethod
+    def _validate_output_length(cls, text: str, field_name: str) -> None:
+        """
+        Validates that AI-generated output doesn't exceed safe limits.
+        Prevents AI from being manipulated into generating excessive content.
+
+        :param text: The AI-generated text to validate
+        :param field_name: Name of the field for error messages
+        :raises ChatBotApiError: If output exceeds maximum length
+        """
+        if len(text) > cls.MAX_FEEDBACK_LENGTH:
+            _LOGGER.error(f"AI output too long: {field_name} is {len(text)} chars (max {cls.MAX_FEEDBACK_LENGTH})")
+            raise ChatBotApiError(
+                f"AI response validation failed: {field_name} exceeds maximum length", status_code=500
+            )
 
     def _call_google_generative_api(
         self,
@@ -213,11 +233,38 @@ class ChatBotWrapper:
         """
         Helper method to make the POST request to Google's Generative AI content generation.
         Handles common request setup and error handling.
+
+        :param chatbot_api_key: Google Generative AI API key
+        :param prompt: The formatted prompt to send to the AI
+        :param timeout_seconds: Request timeout in seconds
+        :return: Parsed JSON response from the AI
+        :raises ChatBotApiError: If the API call fails or returns invalid data
         """
         api_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
         request_payload = {
             "contents": [{"parts": [{"text": prompt}]}],
-            "generationConfig": {"maxOutputTokens": 200},
+            "generationConfig": {
+                "maxOutputTokens": 200,  # Limit output size
+                "temperature": 0.3,  # Lower = more consistent, less creative
+            },
+            "safetySettings": [
+                {
+                    "category": "HARM_CATEGORY_HARASSMENT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE",
+                },
+                {
+                    "category": "HARM_CATEGORY_HATE_SPEECH",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE",
+                },
+                {
+                    "category": "HARM_CATEGORY_SEXUALLY_EXPLICIT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE",
+                },
+                {
+                    "category": "HARM_CATEGORY_DANGEROUS_CONTENT",
+                    "threshold": "BLOCK_MEDIUM_AND_ABOVE",
+                },
+            ],
         }
 
         try:
@@ -275,6 +322,18 @@ class ChatBotWrapper:
         explanation: str,
         extra_context: typing.Optional[str] = None,
     ) -> str:
+        """
+        Generates the formatted prompt for reflection feedback evaluation.
+        Selects appropriate template based on whether code is predefined or student-created.
+
+        :param topic: The topic being analyzed
+        :param is_topic_predefined: Whether the topic was provided or student-chosen
+        :param code: The Python code being analyzed
+        :param is_code_predefined: Whether code was provided or student-written
+        :param explanation: Student's explanation of the code
+        :param extra_context: Optional instructor-provided evaluation context
+        :return: Formatted prompt string for AI evaluation
+        """
         # Format the extra context section if provided
         extra_context_section = ""
         if extra_context:
@@ -300,6 +359,30 @@ class ChatBotWrapper:
         explanation: str,
         extra_context: typing.Optional[str] = None,
     ) -> ChatBotFeedback:
+        """
+        Calls the AI API to generate feedback on a student's reflection submission.
+        Validates input before calling API and validates output length to prevent manipulation.
+
+        :param chatbot_api_key: Google Generative AI API key
+        :param topic: The topic being analyzed
+        :param is_topic_predefined: Whether the topic was provided or student-chosen
+        :param code: The Python code being analyzed
+        :param is_code_predefined: Whether code was provided or student-written
+        :param explanation: Student's explanation of the code
+        :param extra_context: Optional instructor-provided evaluation context
+        :return: ChatBotFeedback containing AI-generated feedback and assessment
+        :raises SuspiciousInputError: If input validation fails
+        :raises ValueError: If response structure is invalid
+        :raises ChatBotApiError: If API call fails or output validation fails
+        """
+        # Validate inputs before calling AI API
+        InputValidator.validate_reflection_input(
+            topic=topic,
+            code=code,
+            explanation=explanation,
+            extra_context=extra_context,
+        )
+
         prompt = self.generate_reflection_feedback_prompt(
             topic=topic,
             is_topic_predefined=is_topic_predefined,
@@ -315,10 +398,15 @@ class ChatBotWrapper:
         )
 
         try:
-            return ChatBotFeedback(**generated_dict)
+            feedback = ChatBotFeedback(**generated_dict)
+
+            # Validate output length (prevent AI manipulation)
+            self._validate_output_length(feedback.aiFeedback, "aiFeedback")
+
+            return feedback
         except ValueError as e:
             _LOGGER.error(f"Error parsing API response: {e}. Raw data: {generated_dict}", exc_info=True)
-            raise ValueError(f"Invalid or unexpected response structure from AI for PRIMM: {str(e)}")
+            raise ValueError(f"Invalid or unexpected response structure from AI for reflection: {str(e)}")
 
     def generate_primm_feedback_prompt(
         self,
@@ -329,6 +417,16 @@ class ChatBotWrapper:
         user_explanation_text: str,
         actual_output_summary: typing.Optional[str],
     ) -> str:
+        """
+        Generates the formatted prompt for PRIMM activity evaluation.
+
+        :param code_snippet: The Python code snippet to evaluate
+        :param prediction_prompt_text: The prediction question/prompt
+        :param user_prediction_text: Student's prediction of code output
+        :param user_explanation_text: Student's explanation of how code works
+        :param actual_output_summary: Summary of actual code execution output
+        :return: Formatted prompt string for AI evaluation
+        """
         return _PRIMM_EVALUATION_PROMPT_TEMPLATE.format(
             code_snippet=code_snippet,
             prediction_prompt_text=prediction_prompt_text,
@@ -347,6 +445,30 @@ class ChatBotWrapper:
         user_explanation_text: str,
         actual_output_summary: typing.Optional[str],
     ) -> PrimmEvaluationResponseModel:
+        """
+        Calls the AI API to evaluate a student's PRIMM activity submission.
+        Validates input before calling API and validates output length to prevent manipulation.
+
+        :param chatbot_api_key: Google Generative AI API key
+        :param code_snippet: The Python code snippet to evaluate
+        :param prediction_prompt_text: The prediction question/prompt
+        :param user_prediction_text: Student's prediction of code output
+        :param user_explanation_text: Student's explanation of how code works
+        :param actual_output_summary: Summary of actual code execution output
+        :return: PrimmEvaluationResponseModel containing AI-generated feedback
+        :raises SuspiciousInputError: If input validation fails
+        :raises ValueError: If response structure is invalid
+        :raises ChatBotApiError: If API call fails or output validation fails
+        """
+        # Validate inputs before calling AI API
+        InputValidator.validate_primm_input(
+            code_snippet=code_snippet,
+            user_prediction_text=user_prediction_text,
+            user_explanation_text=user_explanation_text,
+            prediction_prompt_text=prediction_prompt_text,
+            actual_output_summary=actual_output_summary,
+        )
+
         prompt = self.generate_primm_feedback_prompt(
             code_snippet=code_snippet,
             prediction_prompt_text=prediction_prompt_text,
@@ -363,6 +485,10 @@ class ChatBotWrapper:
         try:
             response = PrimmEvaluationResponseModel.model_validate(generated_dict)
             _LOGGER.info(f"Parsed: {response.model_dump_json(indent=2, exclude_none=True)}")
+
+            # Validate output length (prevent AI manipulation)
+            self._validate_output_length(response.ai_overall_comment, "aiOverallComment")
+
             return response
 
         except (pydantic.ValidationError, ValueError) as e:

@@ -37,6 +37,7 @@ from thoughtful_backend.utils.aws_env_vars import (
 )
 from thoughtful_backend.utils.base_types import LessonId, SectionId, UserId
 from thoughtful_backend.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
+from thoughtful_backend.utils.input_validator import SuspiciousInputError
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -280,6 +281,10 @@ class LearningEntriesApiHandler:
                 _LOGGER.warning("Unsupported HTTP method for /learning-entries: %s", http_method)
                 return create_error_response(ErrorCode.METHOD_NOT_ALLOWED, event=event)
 
+        except SuspiciousInputError as se:
+            _LOGGER.warning(f"Input validation failed for user {user_id}: {str(se)}", exc_info=False)
+            self.metrics_manager.put_metric("InputValidationFailed", 1)
+            return create_error_response(ErrorCode.VALIDATION_ERROR, str(se), event=event)
         except ValueError as ve:
             _LOGGER.warning(f"ValueError in handler: {str(ve)}", exc_info=False)
             return create_error_response(ErrorCode.VALIDATION_ERROR, str(ve), event=event)
