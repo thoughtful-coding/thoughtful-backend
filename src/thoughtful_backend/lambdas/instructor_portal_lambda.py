@@ -187,52 +187,6 @@ class InstructorPortalApiHandler:
             )
             return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
 
-    def _handle_get_student_primm_submissions(
-        self,
-        instructor_id: InstructorId,
-        student_id: UserId,
-        event: dict,
-    ) -> dict:
-        """
-        Handles an instructor's request to view a specific student's PRIMM submissions.
-        """
-        _LOGGER.info(f"Instructor {instructor_id} requesting PRIMM submissions for student {student_id}")
-
-        # 1. Permission Check
-        has_permission = self.user_permissions_table.check_permission(
-            granter_user_id=student_id,
-            grantee_user_id=instructor_id,
-            permission_type="VIEW_STUDENT_DATA_FULL",
-        )
-        if not has_permission:
-            _LOGGER.warning(f"Forbidden: Instructor {instructor_id} lacks permission for student {student_id}.")
-            return create_error_response(ErrorCode.AUTHORIZATION_FAILED, event=event)
-
-        try:
-            query_params = get_query_string_parameters(event)
-
-            submissions, next_last_key = self.primm_submissions_table.get_submissions_by_student(
-                user_id=student_id,
-                lesson_id_filter=None,
-                section_id_filter=None,
-                primm_example_id_filter=None,
-                limit=get_pagination_limit(query_params),
-                last_evaluated_key=get_last_evaluated_key(query_params),
-            )
-
-            response_payload = {
-                "submissions": [item.model_dump(by_alias=True, exclude_none=True) for item in submissions],
-                "lastEvaluatedKey": next_last_key,
-            }
-            return format_lambda_response(200, response_payload)
-
-        except Exception as e:
-            _LOGGER.error(
-                f"Error fetching PRIMM submissions for student {student_id}: {e}",
-                exc_info=True,
-            )
-            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
-
     def _handle_get_student_detailed_progress(
         self,
         instructor_id: InstructorId,
@@ -568,21 +522,6 @@ class InstructorPortalApiHandler:
                     _LOGGER.warning(f"Malformed path for learning entries: {path}")
                     return create_error_response(
                         ErrorCode.VALIDATION_ERROR, "Malformed URL for finalized learning entries.", event=event
-                    )
-
-            elif (
-                http_method == "GET"
-                and path.startswith("/instructor/students/")
-                and path.endswith("/primm-submissions")
-            ):
-                # Path: /instructor/students/{studentId}/primm-submissions
-                if len(path_parts) == 4:
-                    student_id = UserId(path_parts[2])
-                    return self._handle_get_student_primm_submissions(instructor_id, student_id, event)
-                else:
-                    _LOGGER.warning(f"Malformed path for PRIMM submissions: {path}")
-                    return create_error_response(
-                        ErrorCode.VALIDATION_ERROR, "Malformed URL for PRIMM submissions.", event=event
                     )
 
             elif (
