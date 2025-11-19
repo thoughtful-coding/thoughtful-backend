@@ -117,8 +117,8 @@ def test_handle_get_progress_for_existing_user():
     section2_id_str = "section_causes"
     timestamp2 = "2025-06-04T00:00:00Z"
 
-    detail1 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp1), attempts_before_success=2)
-    detail2 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp2), attempts_before_success=1)
+    detail1 = SectionCompletionDetail(completedAt=IsoTimestamp(timestamp1), attemptsBeforeSuccess=2)
+    detail2 = SectionCompletionDetail(completedAt=IsoTimestamp(timestamp2), attemptsBeforeSuccess=1)
 
     progress_list = [
         UserUnitProgressModel(
@@ -234,8 +234,8 @@ def test_handle_put_progress_successful_update():
 
     # Mock what get_all_unit_progress_for_user returns *after* the update
     timestamp = "2025-06-04T00:00:00Z"
-    detail1 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp), attempts_before_success=3)
-    detail2 = SectionCompletionDetail(completed_at=IsoTimestamp(timestamp), attempts_before_success=1)
+    detail1 = SectionCompletionDetail(completedAt=IsoTimestamp(timestamp), attemptsBeforeSuccess=3)
+    detail2 = SectionCompletionDetail(completedAt=IsoTimestamp(timestamp), attemptsBeforeSuccess=1)
 
     mock_aggregated_response_state = [
         UserUnitProgressModel(

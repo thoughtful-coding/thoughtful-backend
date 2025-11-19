@@ -487,7 +487,7 @@ class ChatBotWrapper:
             _LOGGER.info(f"Parsed: {response.model_dump_json(indent=2, exclude_none=True)}")
 
             # Validate output length (prevent AI manipulation)
-            self._validate_output_length(response.ai_overall_comment, "aiOverallComment")
+            self._validate_output_length(response.aiOverallComment, "aiOverallComment")
 
             return response
 

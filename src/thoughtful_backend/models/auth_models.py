@@ -1,23 +1,14 @@
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 
 class TokenPayload(BaseModel):
-    access_token: str = Field(..., alias="accessToken")
-    refresh_token: str = Field(..., alias="refreshToken")
-
-    class Config:
-        populate_by_name = True
+    accessToken: str
+    refreshToken: str
 
 
 class LoginRequest(BaseModel):
-    google_id_token: str = Field(..., alias="googleIdToken")
-
-    class Config:
-        populate_by_name = True
+    googleIdToken: str
 
 
 class RefreshRequest(BaseModel):
-    refresh_token: str = Field(..., alias="refreshToken")
-
-    class Config:
-        populate_by_name = True
+    refreshToken: str

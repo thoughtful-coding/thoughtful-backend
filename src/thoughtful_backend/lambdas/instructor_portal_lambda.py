@@ -16,6 +16,7 @@ from thoughtful_backend.models.instructor_portal_models import (
     StudentUnitCompletionDataModel,
     UnitProgressProfileModel,
 )
+from thoughtful_backend.models.learning_entry_models import ReflectionVersionItemModel
 from thoughtful_backend.utils.apig_utils import (
     ErrorCode,
     create_error_response,
@@ -216,8 +217,8 @@ class InstructorPortalApiHandler:
             if not all_progress:
                 # No progress for this student
                 response_model = StudentDetailedProgressResponseModel(
-                    student_id=student_id,
-                    student_name=None,
+                    studentId=student_id,
+                    studentName=None,
                     profile=[],
                 )
                 return format_lambda_response(200, response_model.model_dump(by_alias=True, exclude_none=True))
@@ -239,9 +240,9 @@ class InstructorPortalApiHandler:
 
             # 4. Build lookup maps for efficient access
             # Map: (lessonId, sectionId) -> list of reflection versions
-            reflections_by_section: dict[tuple[LessonId, SectionId], list] = {}
+            reflections_by_section: dict[tuple[LessonId, SectionId], list[ReflectionVersionItemModel]] = {}
             for reflection in all_reflections:
-                key = (reflection.lesson_id, reflection.section_id)
+                key = (reflection.lessonId, reflection.sectionId)
                 if key not in reflections_by_section:
                     reflections_by_section[key] = []
                 reflections_by_section[key].append(reflection)
@@ -276,14 +277,12 @@ class InstructorPortalApiHandler:
                             )
                             sections_list.append(
                                 SectionStatusItemModel(
-                                    section_id=section_id,
-                                    section_title="",  # Frontend will populate
-                                    section_kind="Reflection",
+                                    sectionId=section_id,
+                                    sectionTitle="",  # Frontend will populate
+                                    sectionKind="Reflection",
                                     status="submitted",
-                                    submission_timestamp=reflection_versions_sorted[0].createdAt,
-                                    submission_details=[
-                                        v.model_dump(by_alias=True) for v in reflection_versions_sorted
-                                    ],
+                                    submissionTimestamp=reflection_versions_sorted[0].createdAt,
+                                    submissionDetails=[v.model_dump(by_alias=True) for v in reflection_versions_sorted],
                                 )
                             )
                             continue
@@ -297,12 +296,12 @@ class InstructorPortalApiHandler:
                             )
                             sections_list.append(
                                 SectionStatusItemModel(
-                                    section_id=section_id,
-                                    section_title="",  # Frontend will populate
-                                    section_kind="PRIMM",
+                                    sectionId=section_id,
+                                    sectionTitle="",  # Frontend will populate
+                                    sectionKind="PRIMM",
                                     status="submitted",
-                                    submission_timestamp=primm_submissions_sorted[0].timestampIso,
-                                    submission_details=[s.model_dump(by_alias=True) for s in primm_submissions_sorted],
+                                    submissionTimestamp=primm_submissions_sorted[0].timestampIso,
+                                    submissionDetails=[s.model_dump(by_alias=True) for s in primm_submissions_sorted],
                                 )
                             )
                             continue
@@ -323,34 +322,34 @@ class InstructorPortalApiHandler:
                         if student_solution:
                             sections_list.append(
                                 SectionStatusItemModel(
-                                    section_id=section_id,
-                                    section_title="",  # Frontend will populate
-                                    section_kind="Testing",
+                                    sectionId=section_id,
+                                    sectionTitle="",  # Frontend will populate
+                                    sectionKind="Testing",
                                     status="submitted",
-                                    submission_timestamp=student_solution.get("submittedAt"),
-                                    submission_details=student_solution,
+                                    submissionTimestamp=student_solution.get("submittedAt"),
+                                    submissionDetails=student_solution,
                                 )
                             )
                             continue
 
                         # No submission, just completed
-                        if completion_detail.completed_at:
+                        if completion_detail.completedAt:
                             sections_list.append(
                                 SectionStatusItemModel(
-                                    section_id=section_id,
-                                    section_title="",  # Frontend will populate
-                                    section_kind="",  # Unknown type
+                                    sectionId=section_id,
+                                    sectionTitle="",  # Frontend will populate
+                                    sectionKind="",  # Unknown type
                                     status="completed",
-                                    submission_timestamp=completion_detail.completed_at,
-                                    submission_details=None,
+                                    submissionTimestamp=completion_detail.completedAt,
+                                    submissionDetails=None,
                                 )
                             )
 
                     if sections_list:
                         lessons_list.append(
                             LessonProgressProfileModel(
-                                lesson_id=lesson_id,
-                                lesson_title="",  # Frontend will populate
+                                lessonId=lesson_id,
+                                lessonTitle="",  # Frontend will populate
                                 sections=sections_list,
                             )
                         )
@@ -358,15 +357,15 @@ class InstructorPortalApiHandler:
                 if lessons_list:
                     profile_list.append(
                         UnitProgressProfileModel(
-                            unit_id=unit_id,
-                            unit_title="",  # Frontend will populate
+                            unitId=unit_id,
+                            unitTitle="",  # Frontend will populate
                             lessons=lessons_list,
                         )
                     )
 
             response_model = StudentDetailedProgressResponseModel(
-                student_id=student_id,
-                student_name=None,  # Not available in current data
+                studentId=student_id,
+                studentName=None,  # Not available in current data
                 profile=profile_list,
             )
             return format_lambda_response(200, response_model.model_dump(by_alias=True, exclude_none=True))

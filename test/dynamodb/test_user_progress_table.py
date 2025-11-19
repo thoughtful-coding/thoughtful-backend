@@ -79,7 +79,7 @@ def test_get_user_unit_progress_exists(progress_table_instance: UserProgressTabl
     section1_id = SectionId("sec_intro")
     timestamp1 = IsoTimestamp(datetime.now(timezone.utc).isoformat())
 
-    completion_detail = SectionCompletionDetail(completed_at=timestamp1, attempts_before_success=1)
+    completion_detail = SectionCompletionDetail(completedAt=timestamp1, attemptsBeforeSuccess=1)
     test_completions = {lesson1_guid: {section1_id: completion_detail}}
     db_item = _create_db_item_for_unit(user_id, unit_id, test_completions)
 
@@ -106,8 +106,8 @@ def test_get_all_unit_progress_multiple_units(progress_table_instance: UserProgr
     lessonA1_guid = LessonId("guid_lA1")
     lessonB1_guid = LessonId("guid_lB1")
 
-    detail1 = SectionCompletionDetail(completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=2)
-    detail2 = SectionCompletionDetail(completed_at=IsoTimestamp("2025-01-02T00:00:00Z"), attempts_before_success=1)
+    detail1 = SectionCompletionDetail(completedAt=IsoTimestamp("2025-01-01T00:00:00Z"), attemptsBeforeSuccess=2)
+    detail2 = SectionCompletionDetail(completedAt=IsoTimestamp("2025-01-02T00:00:00Z"), attemptsBeforeSuccess=1)
 
     db_item1 = _create_db_item_for_unit(user_id, unit1_id, {lessonA1_guid: {"s1": detail1}})
     db_item2 = _create_db_item_for_unit(user_id, unit2_id, {lessonB1_guid: {"sX": detail2}})
@@ -155,8 +155,8 @@ def test_batch_update_new_user_new_unit_new_lesson_new_section(progress_table_in
 
     completion_detail = updated_unit_progress.completion[lesson_guid][section_id]
     assert isinstance(completion_detail, SectionCompletionDetail)
-    assert completion_detail.attempts_before_success == 3
-    assert completion_detail.completed_at is not None
+    assert completion_detail.attemptsBeforeSuccess == 3
+    assert completion_detail.completedAt is not None
 
     # Verify directly from DB
     db_check = progress_table_instance.get_user_unit_progress(user_id, unit_id)
@@ -173,9 +173,7 @@ def test_batch_update_existing_user_existing_unit_new_lesson(progress_table_inst
     sectionB_id = SectionId("sectionB")
 
     # Pre-populate with lesson1 progress
-    initial_detail = SectionCompletionDetail(
-        completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=1
-    )
+    initial_detail = SectionCompletionDetail(completedAt=IsoTimestamp("2025-01-01T00:00:00Z"), attemptsBeforeSuccess=1)
     initial_completions = {lesson1_guid: {sectionA_id: initial_detail}}
     initial_item = _create_db_item_for_unit(user_id, unit_id, initial_completions)
     progress_table_instance.table.put_item(Item=initial_item)
@@ -205,9 +203,7 @@ def test_batch_update_existing_user_existing_unit_existing_lesson_new_section(
     section1_id = SectionId("section1")
     section2_id = SectionId("section2")  # New section for existing lesson
 
-    initial_detail = SectionCompletionDetail(
-        completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=1
-    )
+    initial_detail = SectionCompletionDetail(completedAt=IsoTimestamp("2025-01-01T00:00:00Z"), attemptsBeforeSuccess=1)
     initial_completions = {lesson_guid: {section1_id: initial_detail}}
     initial_item = _create_db_item_for_unit(user_id, unit_id, initial_completions)
     progress_table_instance.table.put_item(Item=initial_item)
@@ -234,9 +230,7 @@ def test_batch_update_section_already_completed_preserves_original_timestamp(
     lesson_guid = LessonId("lesson_ts_guid")
     section_id = SectionId("section_ts")
 
-    original_detail = SectionCompletionDetail(
-        completed_at=IsoTimestamp("2025-01-01T00:00:00Z"), attempts_before_success=2
-    )
+    original_detail = SectionCompletionDetail(completedAt=IsoTimestamp("2025-01-01T00:00:00Z"), attemptsBeforeSuccess=2)
     initial_completions = {lesson_guid: {section_id: original_detail}}
     initial_item = _create_db_item_for_unit(user_id, unit_id, initial_completions)
     progress_table_instance.table.put_item(Item=initial_item)

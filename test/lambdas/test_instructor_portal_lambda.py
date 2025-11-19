@@ -436,7 +436,7 @@ def test_user_progress_api_handler_handle_get_16():
         unitId="unit1",
         completion={
             "lesson1": {
-                "section1": SectionCompletionDetail(completed_at="2025-01-01T00:00:00Z", attempts_before_success=1)
+                "section1": SectionCompletionDetail(completedAt="2025-01-01T00:00:00Z", attemptsBeforeSuccess=1)
             },
         },
     )

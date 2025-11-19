@@ -229,9 +229,9 @@ def test_call_primm_feedback_api_normal_behavior(mock_post):
         actual_output_summary="it went around",
     )
 
-    assert feedback.ai_prediction_assessment == "mostly"
-    assert feedback.ai_explanation_assessment == "developing"
-    assert feedback.ai_overall_comment == "I need more"
+    assert feedback.aiPredictionAssessment == "mostly"
+    assert feedback.aiExplanationAssessment == "developing"
+    assert feedback.aiOverallComment == "I need more"
 
     mock_post.assert_called_once()
 

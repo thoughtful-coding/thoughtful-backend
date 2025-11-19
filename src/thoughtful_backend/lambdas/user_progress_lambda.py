@@ -22,7 +22,6 @@ from thoughtful_backend.utils.apig_utils import (
 )
 from thoughtful_backend.utils.aws_env_vars import get_first_solutions_table_name, get_user_progress_table_name
 from thoughtful_backend.utils.base_types import (
-    IsoTimestamp,
     LessonId,
     SectionId,
     UnitId,

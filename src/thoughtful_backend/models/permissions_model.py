@@ -2,7 +2,7 @@
 import typing
 from datetime import datetime
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from thoughtful_backend.utils.base_types import InstructorId, UserId
 

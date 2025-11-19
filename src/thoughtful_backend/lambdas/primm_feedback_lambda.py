@@ -62,7 +62,7 @@ class PrimmFeedbackApiHandler:
             # Validate request body using Pydantic model
             request_data = PrimmEvaluationRequestModel.model_validate_json(raw_body)
             _LOGGER.info(
-                f"Parsed PrimmEvaluationRequest for lesson: {request_data.lesson_id}, section: {request_data.section_id}, example: {request_data.primm_example_id}"
+                f"Parsed PrimmEvaluationRequest for lesson: {request_data.lessonId}, section: {request_data.sectionId}, example: {request_data.primmExampleId}"
             )
 
         except ValidationError as e:
@@ -77,11 +77,11 @@ class PrimmFeedbackApiHandler:
 
             ai_eval_response: PrimmEvaluationResponseModel = self.chatbot_wrapper.call_primm_evaluation_api(
                 chatbot_api_key=self.secrets_repo.get_chatbot_api_key(),
-                code_snippet=request_data.code_snippet,
-                prediction_prompt_text=request_data.user_prediction_prompt_text,
-                user_prediction_text=request_data.user_prediction_text,
-                user_explanation_text=request_data.user_explanation_text,
-                actual_output_summary=request_data.actual_output_summary,
+                code_snippet=request_data.codeSnippet,
+                prediction_prompt_text=request_data.userPredictionPromptText,
+                user_prediction_text=request_data.userPredictionText,
+                user_explanation_text=request_data.userExplanationText,
+                actual_output_summary=request_data.actualOutputSummary,
             )
             try:
                 save_success = self.primm_submissions_table.save_submission(
@@ -90,7 +90,7 @@ class PrimmFeedbackApiHandler:
                     evaluation_data=ai_eval_response,  # This is PrimmEvaluationResponseModel instance
                 )
                 if not save_success:
-                    _LOGGER.error(f"Failed PRIMM submission save for {user_id}, ex. {request_data.primm_example_id}")
+                    _LOGGER.error(f"Failed PRIMM submission save for {user_id}, ex. {request_data.primmExampleId}")
                     # Continue to return 200 to client as AI feedback was successful
             except Exception as db_save_ex:
                 _LOGGER.error(f"Exception saving PRIMM submission for user {user_id}: {db_save_ex}", exc_info=True)

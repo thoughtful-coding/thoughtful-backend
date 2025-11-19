@@ -55,32 +55,32 @@ class PrimmSubmissionsTable:
             timestamp_iso = IsoTimestamp(datetime.now(timezone.utc).isoformat())
 
         submission_sk = self._make_submission_sk(
-            request_data.lesson_id, request_data.section_id, request_data.primm_example_id, timestamp_iso
+            request_data.lessonId, request_data.sectionId, request_data.primmExampleId, timestamp_iso
         )
 
         item_to_save = {
             "userId": user_id,
             "submissionCompositeKey": submission_sk,
-            "lessonId": request_data.lesson_id,
-            "sectionId": request_data.section_id,
-            "primmExampleId": request_data.primm_example_id,
+            "lessonId": request_data.lessonId,
+            "sectionId": request_data.sectionId,
+            "primmExampleId": request_data.primmExampleId,
             "timestampIso": timestamp_iso,  # Store the timestamp for querying/sorting if needed
             "createdAt": datetime.now(timezone.utc).isoformat(),  # General record creation time
             # From PrimmEvaluationRequestModel (user's input)
-            "codeSnippet": request_data.code_snippet,
-            "userPredictionPromptText": request_data.user_prediction_prompt_text,
-            "userPredictionText": request_data.user_prediction_text,
-            "actualOutputSummary": request_data.actual_output_summary,
-            "userExplanationText": request_data.user_explanation_text,
+            "codeSnippet": request_data.codeSnippet,
+            "userPredictionPromptText": request_data.userPredictionPromptText,
+            "userPredictionText": request_data.userPredictionText,
+            "actualOutputSummary": request_data.actualOutputSummary,
+            "userExplanationText": request_data.userExplanationText,
             # From PrimmEvaluationResponseModel (AI's evaluation)
             # These align with your corrected Swagger for PrimmEvaluationResponse
             "aiPredictionAssessment": (
-                evaluation_data.ai_prediction_assessment if evaluation_data.ai_prediction_assessment else None
+                evaluation_data.aiPredictionAssessment if evaluation_data.aiPredictionAssessment else None
             ),
             "aiExplanationAssessment": (
-                evaluation_data.ai_explanation_assessment if evaluation_data.ai_explanation_assessment else None
+                evaluation_data.aiExplanationAssessment if evaluation_data.aiExplanationAssessment else None
             ),
-            "aiOverallComment": evaluation_data.ai_overall_comment,
+            "aiOverallComment": evaluation_data.aiOverallComment,
             # If you decide to store granular AI text feedback:
             # 'aiPredictionFeedback': evaluation_data.prediction_feedback,
             # 'aiExplanationFeedback': evaluation_data.explanation_feedback,
@@ -91,12 +91,12 @@ class PrimmSubmissionsTable:
         try:
             self.table.put_item(Item=item_to_save_cleaned)
             _LOGGER.info(
-                f"PRIMM submission saved for user '{user_id}', example '{request_data.primm_example_id}' at {timestamp_iso}."
+                f"PRIMM submission saved for user '{user_id}', example '{request_data.primmExampleId}' at {timestamp_iso}."
             )
             return True
         except ClientError as e:
             _LOGGER.error(
-                f"Error saving PRIMM submission for user '{user_id}', example '{request_data.primm_example_id}': {e.response['Error']['Message']}"
+                f"Error saving PRIMM submission for user '{user_id}', example '{request_data.primmExampleId}': {e.response['Error']['Message']}"
             )
             return False
 

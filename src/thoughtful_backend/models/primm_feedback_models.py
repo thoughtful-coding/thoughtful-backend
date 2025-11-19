@@ -1,32 +1,26 @@
 import typing
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel
 
 from thoughtful_backend.models.learning_entry_models import AssessmentLevel
 from thoughtful_backend.utils.base_types import IsoTimestamp, LessonId, SectionId, UserId
 
 
 class PrimmEvaluationRequestModel(BaseModel):
-    lesson_id: LessonId = Field(..., alias="lessonId")
-    section_id: SectionId = Field(..., alias="sectionId")
-    primm_example_id: str = Field(..., alias="primmExampleId")
-    code_snippet: str = Field(..., alias="codeSnippet")
-    user_prediction_prompt_text: str = Field(..., alias="userPredictionPromptText")
-    user_prediction_text: str = Field(..., alias="userPredictionText")
-    user_explanation_text: str = Field(..., alias="userExplanationText")
-    actual_output_summary: typing.Optional[str] = Field(None, alias="actualOutputSummary")
-
-    class Config:
-        populate_by_name = True  # Allows parsing JSON with camelCase keys to snake_case fields
+    lessonId: LessonId
+    sectionId: SectionId
+    primmExampleId: str
+    codeSnippet: str
+    userPredictionPromptText: str
+    userPredictionText: str
+    userExplanationText: str
+    actualOutputSummary: typing.Optional[str] = None
 
 
 class PrimmEvaluationResponseModel(BaseModel):
-    ai_prediction_assessment: AssessmentLevel = Field(..., alias="aiPredictionAssessment")
-    ai_explanation_assessment: AssessmentLevel = Field(..., alias="aiExplanationAssessment")
-    ai_overall_comment: str = Field(..., alias="aiOverallComment")
-
-    class Config:
-        populate_by_name = True
+    aiPredictionAssessment: AssessmentLevel
+    aiExplanationAssessment: AssessmentLevel
+    aiOverallComment: str
 
 
 class StoredPrimmSubmissionItemModel(BaseModel):
@@ -50,6 +44,3 @@ class StoredPrimmSubmissionItemModel(BaseModel):
     aiPredictionAssessment: AssessmentLevel
     aiExplanationAssessment: typing.Optional[AssessmentLevel] = None
     aiOverallComment: typing.Optional[str] = None
-
-    class Config:
-        populate_by_name = True

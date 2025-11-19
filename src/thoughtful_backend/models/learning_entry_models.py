@@ -28,10 +28,6 @@ class ReflectionInteractionInputModel(pydantic.BaseModel):
     sourceVersionId: typing.Optional[str] = None
     extraContext: typing.Optional[str] = None
 
-    class Config:
-        # Pydantic V2: from_attributes = True (if creating from ORM models, not relevant here)
-        extra = "forbid"  # Disallow extra fields in request
-
 
 class ReflectionVersionItemModel(pydantic.BaseModel):
     """

@@ -1,6 +1,6 @@
 import typing
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, field_validator
 
 from thoughtful_backend.utils.base_types import IsoTimestamp, LessonId, SectionId, UnitId, UserId
 
@@ -42,6 +42,3 @@ class FirstSolutionSubmissionResponseModel(BaseModel):
 
     submissions: list[StoredFirstSolutionItemModel]
     lastEvaluatedKey: typing.Optional[dict] = None
-
-    class Config:
-        populate_by_name = True

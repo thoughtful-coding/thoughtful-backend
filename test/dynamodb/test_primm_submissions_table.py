@@ -81,23 +81,23 @@ def test_save_submission_successful(primm_submissions_table_instance: PrimmSubmi
 
     # Verify item in DynamoDB
     sk = primm_submissions_table_instance._make_submission_sk(
-        req_data.lesson_id, req_data.section_id, req_data.primm_example_id, timestamp_iso
+        req_data.lessonId, req_data.sectionId, req_data.primmExampleId, timestamp_iso
     )
     response = primm_submissions_table_instance.table.get_item(Key={"userId": user_id, "submissionCompositeKey": sk})
     item = response.get("Item")
 
     assert item is not None
     assert item["userId"] == user_id
-    assert item["lessonId"] == req_data.lesson_id
-    assert item["sectionId"] == req_data.section_id
-    assert item["primmExampleId"] == req_data.primm_example_id
+    assert item["lessonId"] == req_data.lessonId
+    assert item["sectionId"] == req_data.sectionId
+    assert item["primmExampleId"] == req_data.primmExampleId
     assert item["timestampIso"] == timestamp_iso
-    assert item["codeSnippet"] == req_data.code_snippet
-    assert item["userPredictionText"] == req_data.user_prediction_text
-    assert item["userExplanationText"] == req_data.user_explanation_text
-    assert item["aiPredictionAssessment"] == eval_data.ai_prediction_assessment
-    assert item["aiExplanationAssessment"] == eval_data.ai_explanation_assessment
-    assert item["aiOverallComment"] == eval_data.ai_overall_comment
+    assert item["codeSnippet"] == req_data.codeSnippet
+    assert item["userPredictionText"] == req_data.userPredictionText
+    assert item["userExplanationText"] == req_data.userExplanationText
+    assert item["aiPredictionAssessment"] == eval_data.aiPredictionAssessment
+    assert item["aiExplanationAssessment"] == eval_data.aiExplanationAssessment
+    assert item["aiOverallComment"] == eval_data.aiOverallComment
     assert "createdAt" in item
 
 

@@ -64,7 +64,7 @@ class AuthApiHandler:
     def _handle_login(self, event: dict) -> dict:
         try:
             body = LoginRequest.model_validate_json(event.get("body", "{}"))
-            google_token_info = self._verify_google_token(body.google_id_token)
+            google_token_info = self._verify_google_token(body.googleIdToken)
 
             if not google_token_info or "email" not in google_token_info:
                 self.metrics_manager.put_metric("LoginFailure", 1)
@@ -98,7 +98,7 @@ class AuthApiHandler:
     def _handle_refresh(self, event: dict) -> dict:
         try:
             body = RefreshRequest.model_validate_json(event.get("body", "{}"))
-            payload = self.jwt_wrapper.verify_token(body.refresh_token, self.secrets_repo)
+            payload = self.jwt_wrapper.verify_token(body.refreshToken, self.secrets_repo)
 
             if not payload or "sub" not in payload or "jti" not in payload:
                 self.metrics_manager.put_metric("RefreshFailure", 1)
@@ -121,7 +121,7 @@ class AuthApiHandler:
 
             return format_lambda_response(
                 200,
-                TokenPayload(accessToken=new_access_token, refreshToken=body.refresh_token).model_dump(by_alias=True),
+                TokenPayload(accessToken=new_access_token, refreshToken=body.refreshToken).model_dump(by_alias=True),
             )
 
         except ValidationError as e:
@@ -136,7 +136,7 @@ class AuthApiHandler:
     def _handle_logout(self, event: dict) -> dict:
         try:
             body = RefreshRequest.model_validate_json(event.get("body", "{}"))
-            payload = self.jwt_wrapper.verify_token(body.refresh_token, self.secrets_repo)
+            payload = self.jwt_wrapper.verify_token(body.refreshToken, self.secrets_repo)
 
             if payload and "sub" in payload and "jti" in payload:
                 user_id = UserId(payload["sub"])

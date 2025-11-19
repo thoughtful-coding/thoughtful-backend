@@ -133,8 +133,8 @@ class UserProgressTable:
 
                 if section_id not in progress_model_to_update.completion[lesson_id]:
                     completion_detail = SectionCompletionDetail(
-                        completed_at=completion_timestamp,
-                        attempts_before_success=comp_input.attemptsBeforeSuccess,
+                        completedAt=completion_timestamp,
+                        attemptsBeforeSuccess=comp_input.attemptsBeforeSuccess,
                     )
                     progress_model_to_update.completion[lesson_id][section_id] = completion_detail
                     unit_was_modified = True

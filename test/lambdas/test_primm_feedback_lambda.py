@@ -107,13 +107,13 @@ def test_primm_feedbackg_api_handler_handle_post_reflection_3():
     Handle proper input
     """
     primm_eval = {
-        "lesson_id": "li",
-        "section_id": "s1",
-        "primm_example_id": "not sure",
-        "code_snippet": "for i in range",
-        "user_prediction_prompt_text": "what's it do?",
-        "user_prediction_text": "it loops",
-        "user_explanation_text": "I was right",
+        "lessonId": "li",
+        "sectionId": "s1",
+        "primmExampleId": "not sure",
+        "codeSnippet": "for i in range",
+        "userPredictionPromptText": "what's it do?",
+        "userPredictionText": "it loops",
+        "userExplanationText": "I was right",
     }
     event = {
         "requestContext": {
