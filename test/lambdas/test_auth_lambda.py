@@ -2,7 +2,9 @@ import json
 from unittest.mock import Mock, patch
 
 from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
-from thoughtful_backend.lambdas.auth_lambda import AuthApiHandler
+from thoughtful_backend.dynamodb.user_permissions_table import UserPermissionsTable
+from thoughtful_backend.dynamodb.user_profile_table import UserProfileTable
+from thoughtful_backend.lambdas.auth_lambda import AuthApiHandler, DEMO_SAMPLE_STUDENTS
 from thoughtful_backend.utils.base_types import RefreshTokenId, UserId
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
 
@@ -17,6 +19,9 @@ def create_auth_api_handler(
     google_client_id=MOCK_GOOGLE_CLIENT_ID,
     jwt_wrapper=JwtWrapper(),
     metrics_manager=Mock(),
+    user_profile_table=Mock(spec=UserProfileTable),
+    user_permissions_table=Mock(spec=UserPermissionsTable),
+    enable_demo_permissions=False,
 ) -> AuthApiHandler:
     """Creates an instance of the handler with mocked dependencies."""
     auth_handler = AuthApiHandler(
@@ -25,12 +30,18 @@ def create_auth_api_handler(
         google_client_id=google_client_id,
         jwt_wrapper=jwt_wrapper,
         metrics_manager=metrics_manager,
+        user_profile_table=user_profile_table,
+        user_permissions_table=user_permissions_table,
+        enable_demo_permissions=enable_demo_permissions,
     )
     assert auth_handler.token_table == token_table
     assert auth_handler.secrets_repo == secrets_repo
     assert auth_handler.google_client_id == google_client_id
     assert auth_handler.jwt_wrapper == jwt_wrapper
     assert auth_handler.metrics_manager == metrics_manager
+    assert auth_handler.user_profile_table == user_profile_table
+    assert auth_handler.user_permissions_table == user_permissions_table
+    assert auth_handler.enable_demo_permissions == enable_demo_permissions
     return auth_handler
 
 
@@ -184,3 +195,179 @@ def test_handle_unknown_auth_path():
     assert response["statusCode"] == 404
     body = json.loads(response["body"])
     assert "Auth route not found" in body["message"]
+
+
+def test_new_user_initialization_with_demo_permissions_enabled():
+    """Tests that a new user gets demo permissions when demo mode is enabled."""
+    mock_token_table = Mock(spec=RefreshTokenTable)
+    mock_token_table.save_token.return_value = True
+
+    mock_user_profile_table = Mock(spec=UserProfileTable)
+    mock_user_profile_table.is_user_initialized.return_value = False
+    mock_user_profile_table.mark_user_initialized.return_value = True
+    mock_user_profile_table.update_last_login.return_value = True
+
+    mock_user_permissions_table = Mock(spec=UserPermissionsTable)
+
+    mock_secret_repo = Mock()
+    mock_secret_repo.get_jwt_secret_key.return_value = "test-key"
+
+    mock_metrics_manager = Mock()
+
+    handler = create_auth_api_handler(
+        token_table=mock_token_table,
+        secrets_repo=mock_secret_repo,
+        user_profile_table=mock_user_profile_table,
+        user_permissions_table=mock_user_permissions_table,
+        metrics_manager=mock_metrics_manager,
+        enable_demo_permissions=True,
+    )
+
+    with patch("thoughtful_backend.lambdas.auth_lambda.requests.get") as mock_requests_get:
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {
+            "aud": MOCK_GOOGLE_CLIENT_ID,
+            "email": "newuser@example.com",
+            "email_verified": True,
+        }
+        mock_requests_get.return_value = mock_response
+
+        event = create_mock_event("POST", "/auth/login", {"googleIdToken": "valid_token"})
+        response = handler.handle(event)
+
+        # Verify login succeeded
+        assert response["statusCode"] == 200
+
+        # Verify last login was updated
+        mock_user_profile_table.update_last_login.assert_called_once_with(UserId("newuser@example.com"))
+
+        # Verify initialization was checked
+        mock_user_profile_table.is_user_initialized.assert_called_once_with(UserId("newuser@example.com"))
+
+        # Verify user was marked as initialized
+        mock_user_profile_table.mark_user_initialized.assert_called_once_with(UserId("newuser@example.com"))
+
+        # Verify demo permissions were granted (3 sample students + self)
+        assert mock_user_permissions_table.grant_permission.call_count == 4
+
+        # Verify permissions granted to sample students
+        for student_id in DEMO_SAMPLE_STUDENTS:
+            mock_user_permissions_table.grant_permission.assert_any_call(
+                granter_user_id=UserId(student_id),
+                grantee_user_id=UserId("newuser@example.com"),
+                permission_type="VIEW_STUDENT_DATA_FULL",
+            )
+
+        # Verify permission granted to view own data
+        mock_user_permissions_table.grant_permission.assert_any_call(
+            granter_user_id=UserId("newuser@example.com"),
+            grantee_user_id=UserId("newuser@example.com"),
+            permission_type="VIEW_STUDENT_DATA_FULL",
+        )
+
+        # Verify metric was emitted
+        mock_metrics_manager.put_metric.assert_any_call("NewUserInitialized", 1)
+
+
+def test_new_user_initialization_with_demo_permissions_disabled():
+    """Tests that a new user does NOT get demo permissions when demo mode is disabled."""
+    mock_token_table = Mock(spec=RefreshTokenTable)
+    mock_token_table.save_token.return_value = True
+
+    mock_user_profile_table = Mock(spec=UserProfileTable)
+    mock_user_profile_table.is_user_initialized.return_value = False
+    mock_user_profile_table.mark_user_initialized.return_value = True
+    mock_user_profile_table.update_last_login.return_value = True
+
+    mock_user_permissions_table = Mock(spec=UserPermissionsTable)
+
+    mock_secret_repo = Mock()
+    mock_secret_repo.get_jwt_secret_key.return_value = "test-key"
+
+    handler = create_auth_api_handler(
+        token_table=mock_token_table,
+        secrets_repo=mock_secret_repo,
+        user_profile_table=mock_user_profile_table,
+        user_permissions_table=mock_user_permissions_table,
+        enable_demo_permissions=False,  # Demo disabled
+    )
+
+    with patch("thoughtful_backend.lambdas.auth_lambda.requests.get") as mock_requests_get:
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {
+            "aud": MOCK_GOOGLE_CLIENT_ID,
+            "email": "newuser@example.com",
+            "email_verified": True,
+        }
+        mock_requests_get.return_value = mock_response
+
+        event = create_mock_event("POST", "/auth/login", {"googleIdToken": "valid_token"})
+        response = handler.handle(event)
+
+        # Verify login succeeded
+        assert response["statusCode"] == 200
+
+        # Verify last login was updated
+        mock_user_profile_table.update_last_login.assert_called_once_with(UserId("newuser@example.com"))
+
+        # Verify initialization was checked
+        mock_user_profile_table.is_user_initialized.assert_called_once_with(UserId("newuser@example.com"))
+
+        # Verify user was marked as initialized
+        mock_user_profile_table.mark_user_initialized.assert_called_once_with(UserId("newuser@example.com"))
+
+        # Verify NO permissions were granted (demo disabled)
+        mock_user_permissions_table.grant_permission.assert_not_called()
+
+
+def test_existing_user_not_re_initialized():
+    """Tests that an already initialized user does not get re-initialized."""
+    mock_token_table = Mock(spec=RefreshTokenTable)
+    mock_token_table.save_token.return_value = True
+
+    mock_user_profile_table = Mock(spec=UserProfileTable)
+    mock_user_profile_table.is_user_initialized.return_value = True  # Already initialized
+    mock_user_profile_table.update_last_login.return_value = True
+
+    mock_user_permissions_table = Mock(spec=UserPermissionsTable)
+
+    mock_secret_repo = Mock()
+    mock_secret_repo.get_jwt_secret_key.return_value = "test-key"
+
+    handler = create_auth_api_handler(
+        token_table=mock_token_table,
+        secrets_repo=mock_secret_repo,
+        user_profile_table=mock_user_profile_table,
+        user_permissions_table=mock_user_permissions_table,
+        enable_demo_permissions=True,  # Demo enabled but user already initialized
+    )
+
+    with patch("thoughtful_backend.lambdas.auth_lambda.requests.get") as mock_requests_get:
+        mock_response = Mock()
+        mock_response.raise_for_status.return_value = None
+        mock_response.json.return_value = {
+            "aud": MOCK_GOOGLE_CLIENT_ID,
+            "email": "existinguser@example.com",
+            "email_verified": True,
+        }
+        mock_requests_get.return_value = mock_response
+
+        event = create_mock_event("POST", "/auth/login", {"googleIdToken": "valid_token"})
+        response = handler.handle(event)
+
+        # Verify login succeeded
+        assert response["statusCode"] == 200
+
+        # Verify last login was updated
+        mock_user_profile_table.update_last_login.assert_called_once_with(UserId("existinguser@example.com"))
+
+        # Verify initialization was checked
+        mock_user_profile_table.is_user_initialized.assert_called_once_with(UserId("existinguser@example.com"))
+
+        # Verify user was NOT marked as initialized again
+        mock_user_profile_table.mark_user_initialized.assert_not_called()
+
+        # Verify NO permissions were granted
+        mock_user_permissions_table.grant_permission.assert_not_called()

@@ -6,6 +6,8 @@ from pydantic import ValidationError
 
 from thoughtful_backend.cloudwatch.metrics import MetricsManager
 from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
+from thoughtful_backend.dynamodb.user_permissions_table import UserPermissionsTable
+from thoughtful_backend.dynamodb.user_profile_table import UserProfileTable
 from thoughtful_backend.models.auth_models import LoginRequest, RefreshRequest, TokenPayload
 from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
 from thoughtful_backend.utils.apig_utils import (
@@ -18,6 +20,9 @@ from thoughtful_backend.utils.apig_utils import (
 from thoughtful_backend.utils.aws_env_vars import (
     get_google_client_id,
     get_refresh_token_table_name,
+    get_user_permissions_table_name,
+    get_user_profile_table_name,
+    is_demo_permissions_enabled,
 )
 from thoughtful_backend.utils.base_types import RefreshTokenId, UserId
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
@@ -26,6 +31,13 @@ _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
 
 GOOGLE_TOKEN_INFO_URL = "https://www.googleapis.com/oauth2/v3/tokeninfo"
+
+# Sample student accounts for demo instructor dashboard
+DEMO_SAMPLE_STUDENTS = [
+    "student1@gmail.com",
+    "student2@gmail.com",
+    "student3@gmail.com",
+]
 
 
 class AuthApiHandler:
@@ -36,12 +48,18 @@ class AuthApiHandler:
         google_client_id: str,
         jwt_wrapper: JwtWrapper,
         metrics_manager: MetricsManager,
+        user_profile_table: UserProfileTable,
+        user_permissions_table: UserPermissionsTable,
+        enable_demo_permissions: bool,
     ):
         self.token_table = token_table
         self.secrets_repo = secrets_repo
         self.google_client_id = google_client_id
         self.jwt_wrapper = jwt_wrapper
         self.metrics_manager = metrics_manager
+        self.user_profile_table = user_profile_table
+        self.user_permissions_table = user_permissions_table
+        self.enable_demo_permissions = enable_demo_permissions
 
     def _verify_google_token(self, token: str) -> typing.Optional[dict]:
         try:
@@ -61,6 +79,55 @@ class AuthApiHandler:
             _LOGGER.error(f"Error verifying Google token: {e}")
             return None
 
+    def _initialize_new_user_if_needed(self, user_id: UserId) -> None:
+        """
+        Initialize new user on first login by:
+        1. Checking if user has been initialized (via profile flag)
+        2. If not initialized AND demo mode is enabled, grant demo permissions
+        3. Mark user as initialized
+
+        This uses a separate flag from permissions so demo mode can be disabled
+        without affecting initialization tracking.
+        """
+        try:
+            # Check if user already initialized
+            if self.user_profile_table.is_user_initialized(user_id):
+                _LOGGER.debug(f"User {user_id} already initialized, skipping initialization.")
+                return
+
+            _LOGGER.info(f"Initializing new user {user_id}. Demo permissions enabled: {self.enable_demo_permissions}")
+
+            # Grant demo permissions if enabled
+            if self.enable_demo_permissions:
+                # Grant permissions to sample students
+                for student_id in DEMO_SAMPLE_STUDENTS:
+                    self.user_permissions_table.grant_permission(
+                        granter_user_id=UserId(student_id),
+                        grantee_user_id=user_id,
+                        permission_type="VIEW_STUDENT_DATA_FULL",
+                    )
+                    _LOGGER.debug(f"Granted permission for {user_id} to view {student_id}")
+
+                # Grant permission to view own data in instructor dashboard
+                self.user_permissions_table.grant_permission(
+                    granter_user_id=user_id,
+                    grantee_user_id=user_id,
+                    permission_type="VIEW_STUDENT_DATA_FULL",
+                )
+                _LOGGER.info(f"Granted demo permissions to new user {user_id}")
+
+            # Mark user as initialized (regardless of demo permissions)
+            if self.user_profile_table.mark_user_initialized(user_id):
+                self.metrics_manager.put_metric("NewUserInitialized", 1)
+                _LOGGER.info(f"Successfully initialized new user {user_id}")
+            else:
+                _LOGGER.error(f"Failed to mark user {user_id} as initialized")
+
+        except Exception as e:
+            # Log error but don't fail login - user can retry on next login
+            _LOGGER.error(f"Error initializing new user {user_id}: {e}", exc_info=True)
+            self.metrics_manager.put_metric("NewUserInitializationFailure", 1)
+
     def _handle_login(self, event: dict) -> dict:
         try:
             body = LoginRequest.model_validate_json(event.get("body", "{}"))
@@ -73,12 +140,19 @@ class AuthApiHandler:
                 )
 
             user_id = UserId(google_token_info["email"])
+
+            # Update user profile with last login timestamp
+            self.user_profile_table.update_last_login(user_id)
+
             access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_repo)
             refresh_token, token_id, ttl = self.jwt_wrapper.create_refresh_token(user_id, self.secrets_repo)
 
             if not self.token_table.save_token(user_id, token_id, ttl):
                 self.metrics_manager.put_metric("LoginFailure", 1)
                 return create_error_response(ErrorCode.INTERNAL_ERROR, "Could not save session", event=event)
+
+            # Initialize new user with demo permissions if needed
+            self._initialize_new_user_if_needed(user_id)
 
             self.metrics_manager.put_metric("LoginSuccess", 1)
             self.metrics_manager.put_metric("RefreshTokenSaved", 1)
@@ -175,6 +249,9 @@ def auth_lambda_handler(event: dict, context: typing.Any) -> dict:
             google_client_id=get_google_client_id(),
             jwt_wrapper=JwtWrapper(),
             metrics_manager=metrics_manager,
+            user_profile_table=UserProfileTable(get_user_profile_table_name()),
+            user_permissions_table=UserPermissionsTable(get_user_permissions_table_name()),
+            enable_demo_permissions=is_demo_permissions_enabled(),
         )
         return handler.handle(event)
     except Exception as e:

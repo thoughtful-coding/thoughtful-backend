@@ -40,6 +40,10 @@ def get_first_solutions_table_name() -> str:
     return _get_resource_by_env_var("FIRST_SOLUTIONS_TABLE_NAME")
 
 
+def get_user_profile_table_name() -> str:
+    return _get_resource_by_env_var("USER_PROFILE_TABLE_NAME")
+
+
 def get_chatbot_api_key_secret_arn() -> str:
     """
     Gets the AWS Secrets Manager secret name/ARN that stores the ChatBot API key.
@@ -56,3 +60,12 @@ def get_jwt_secret_arn() -> str:
 
 def get_google_client_id() -> str:
     return _get_resource_by_env_var("GOOGLE_CLIENT_ID")
+
+
+def is_demo_permissions_enabled() -> bool:
+    """
+    Checks if demo permissions should be automatically granted to new users.
+    Defaults to False if not set or invalid value.
+    """
+    value = os.environ.get("ENABLE_DEMO_PERMISSIONS", "false").lower()
+    return value in ("true", "1", "yes")
