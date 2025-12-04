@@ -12,20 +12,20 @@ from ..test_utils.authorizer import add_authorizer_info
 def create_learning_entries_api_handler(
     learning_entries_table=Mock(),
     throttle_table=Mock(),
-    secrets_repo=Mock(),
+    secrets_table=Mock(),
     chatbot_wrapper=Mock(),
     metrics_manager=Mock(),
 ) -> LearningEntriesApiHandler:
     authorizer_handler = LearningEntriesApiHandler(
         learning_entries_table,
         throttle_table,
-        secrets_repo,
+        secrets_table,
         chatbot_wrapper,
         metrics_manager=metrics_manager,
     )
     assert authorizer_handler.learning_entries_table == learning_entries_table
     assert authorizer_handler.throttle_table == throttle_table
-    assert authorizer_handler.secrets_repo == secrets_repo
+    assert authorizer_handler.secrets_table == secrets_table
     assert authorizer_handler.chatbot_wrapper == chatbot_wrapper
     assert authorizer_handler.metrics_manager == metrics_manager
 
@@ -304,7 +304,6 @@ def test_learning_entries_api_handler_handle_post_reflection_3():
     mock_context_manager.__exit__.return_value = None
     throttle_table.throttle_action.return_value = mock_context_manager
 
-    secrets_manager = Mock()
     chatbot_wrapper = Mock()
     chatbot_wrapper.call_reflection_api.return_value = ChatBotFeedback("looks good", "mostly")
 
@@ -366,7 +365,6 @@ def test_learning_entries_api_handler_handle_post_reflection_with_extra_context(
     mock_context_manager.__exit__.return_value = None
     throttle_table.throttle_action.return_value = mock_context_manager
 
-    secrets_manager = Mock()
     chatbot_wrapper = Mock()
     chatbot_wrapper.call_reflection_api.return_value = ChatBotFeedback("looks good", "mostly")
 

@@ -7,6 +7,7 @@ from pydantic import ValidationError
 
 from thoughtful_backend.cloudwatch.metrics import MetricsManager
 from thoughtful_backend.dynamodb.learning_entries_table import LearningEntriesTable
+from thoughtful_backend.dynamodb.secrets_table import SecretsTable
 from thoughtful_backend.dynamodb.throttle_table import (
     ThrottleRateLimitExceededException,
     ThrottleTable,
@@ -17,7 +18,6 @@ from thoughtful_backend.models.learning_entry_models import (
     ReflectionInteractionInputModel,
     ReflectionVersionItemModel,
 )
-from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
 from thoughtful_backend.utils.apig_utils import (
     ErrorCode,
     QueryParams,
@@ -33,6 +33,7 @@ from thoughtful_backend.utils.apig_utils import (
 )
 from thoughtful_backend.utils.aws_env_vars import (
     get_learning_entries_table_name,
+    get_secrets_table_name,
     get_throttle_table_name,
 )
 from thoughtful_backend.utils.base_types import LessonId, SectionId, UserId
@@ -48,13 +49,13 @@ class LearningEntriesApiHandler:
         self,
         learning_entries_table: LearningEntriesTable,
         throttle_table: ThrottleTable,
-        secrets_repo: SecretsRepository,
+        secrets_table: SecretsTable,
         chatbot_wrapper: ChatBotWrapper,
         metrics_manager: MetricsManager,
     ):
         self.learning_entries_table = learning_entries_table
         self.throttle_table = throttle_table
-        self.secrets_repo = secrets_repo
+        self.secrets_table = secrets_table
         self.chatbot_wrapper = chatbot_wrapper
         self.metrics_manager = metrics_manager
 
@@ -73,7 +74,7 @@ class LearningEntriesApiHandler:
 
         with self.throttle_table.throttle_action(user_id, "REFLECTION_FEEDBACK_CHATBOT_API_CALL"):
             ai_response = self.chatbot_wrapper.call_reflection_api(
-                chatbot_api_key=self.secrets_repo.get_chatbot_api_key(),
+                chatbot_api_key=self.secrets_table.get_chatbot_api_key(),
                 topic=interaction_input.userTopic,
                 is_topic_predefined=interaction_input.isUserTopicPredefined,
                 code=interaction_input.userCode,
@@ -309,13 +310,13 @@ def learning_entries_lambda_handler(event: dict, context: typing.Any) -> dict:
     try:
         learning_entries_table = LearningEntriesTable(get_learning_entries_table_name())
         throttle_table = ThrottleTable(get_throttle_table_name())
-        secrets_repo = SecretsRepository()
+        secrets_table = SecretsTable(get_secrets_table_name())
         chatbot_wrapper = ChatBotWrapper()
 
         api_handler = LearningEntriesApiHandler(
             learning_entries_table=learning_entries_table,
             throttle_table=throttle_table,
-            secrets_repo=secrets_repo,
+            secrets_table=secrets_table,
             chatbot_wrapper=chatbot_wrapper,
             metrics_manager=metrics_manager,
         )

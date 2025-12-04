@@ -9,26 +9,26 @@ MOCK_USER_ID = UserId("12345_google_user_sub")
 
 
 def create_authorizer_lambda(
-    secrets_repo=Mock(),
+    secrets_table=Mock(),
     jwt_wrapper=JwtWrapper(),
     metrics_manager=Mock(),
 ) -> AuthorizerLambda:
     authorizer_handler = AuthorizerLambda(
-        secrets_repo=secrets_repo,
+        secrets_table=secrets_table,
         jwt_wrapper=jwt_wrapper,
         metrics_manager=metrics_manager,
     )
-    assert authorizer_handler.secrets_repo == secrets_repo
+    assert authorizer_handler.secrets_table == secrets_table
     assert authorizer_handler.jwt_wrapper == jwt_wrapper
     assert authorizer_handler.metrics_manager == metrics_manager
     return authorizer_handler
 
 
 def test_authorizer_lambda_handler_1() -> None:
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "hey"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "hey"
 
-    refresh_token, _, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secret_repo)
+    refresh_token, _, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secrets_table)
 
     event = {
         "version": "1.0",
@@ -60,7 +60,7 @@ def test_authorizer_lambda_handler_1() -> None:
         },
     }
 
-    authorizer_lambda = create_authorizer_lambda(secrets_repo=mock_secret_repo)
+    authorizer_lambda = create_authorizer_lambda(secrets_table=mock_secrets_table)
     result = authorizer_lambda.handle(event)
     assert result["principalId"] == "12345_google_user_sub"
     assert result["policyDocument"]["Statement"][0]["Action"] == "execute-api:Invoke"

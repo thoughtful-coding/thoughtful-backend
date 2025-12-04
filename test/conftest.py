@@ -34,12 +34,7 @@ def setup_test_environment():
     os.environ["THROTTLING_TABLE_NAME"] = "test-throttle-table"
     os.environ["FIRST_SOLUTIONS_TABLE_NAME"] = "test-first-solutions-table"
     os.environ["USER_PROFILE_TABLE_NAME"] = "test-user-profile-table"
-
-    # AWS Secrets Manager ARNs
-    os.environ["JWT_SECRET_ARN"] = "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-jwt-secret"
-    os.environ["CHATBOT_API_KEY_SECRET_ARN"] = (
-        "arn:aws:secretsmanager:us-east-1:123456789012:secret:test-chatbot-api-key"
-    )
+    os.environ["SECRETS_TABLE_NAME"] = "test-secrets-table"
 
     # Google OAuth Configuration
     os.environ["GOOGLE_CLIENT_ID"] = "test-google-client-id.apps.googleusercontent.com"

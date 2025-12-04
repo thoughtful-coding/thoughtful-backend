@@ -10,7 +10,7 @@ from ..test_utils.authorizer import add_authorizer_info
 
 def create_primm_feedback_api_handler(
     throttle_table=Mock(),
-    secrets_repo=Mock(),
+    secrets_table=Mock(),
     chatbot_wrapper=Mock(),
     primm_submissions_table=Mock(),
     metrics_manager=Mock(),
@@ -18,13 +18,13 @@ def create_primm_feedback_api_handler(
 
     ret = PrimmFeedbackApiHandler(
         throttle_table,
-        secrets_repo,
+        secrets_table,
         chatbot_wrapper,
         primm_submissions_table,
         metrics_manager=metrics_manager,
     )
     assert ret.throttle_table == throttle_table
-    assert ret.secrets_repo == secrets_repo
+    assert ret.secrets_table == secrets_table
     assert ret.chatbot_wrapper == chatbot_wrapper
     assert ret.primm_submissions_table == primm_submissions_table
     assert ret.metrics_manager == metrics_manager

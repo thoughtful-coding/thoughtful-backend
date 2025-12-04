@@ -44,18 +44,8 @@ def get_user_profile_table_name() -> str:
     return _get_resource_by_env_var("USER_PROFILE_TABLE_NAME")
 
 
-def get_chatbot_api_key_secret_arn() -> str:
-    """
-    Gets the AWS Secrets Manager secret name/ARN that stores the ChatBot API key.
-    """
-    return _get_resource_by_env_var("CHATBOT_API_KEY_SECRET_ARN")
-
-
-def get_jwt_secret_arn() -> str:
-    """
-    Gets the AWS Secrets Manager secret name/ARN that stores the JWT information.
-    """
-    return _get_resource_by_env_var("JWT_SECRET_ARN")
+def get_secrets_table_name() -> str:
+    return _get_resource_by_env_var("SECRETS_TABLE_NAME")
 
 
 def get_google_client_id() -> str:

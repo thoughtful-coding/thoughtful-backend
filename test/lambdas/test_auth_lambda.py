@@ -15,7 +15,7 @@ MOCK_USER_ID = UserId("12345_google_user_sub")
 
 def create_auth_api_handler(
     token_table=Mock(spec=RefreshTokenTable),
-    secrets_repo=Mock(),
+    secrets_table=Mock(),
     google_client_id=MOCK_GOOGLE_CLIENT_ID,
     jwt_wrapper=JwtWrapper(),
     metrics_manager=Mock(),
@@ -26,7 +26,7 @@ def create_auth_api_handler(
     """Creates an instance of the handler with mocked dependencies."""
     auth_handler = AuthApiHandler(
         token_table=token_table,
-        secrets_repo=secrets_repo,
+        secrets_table=secrets_table,
         google_client_id=google_client_id,
         jwt_wrapper=jwt_wrapper,
         metrics_manager=metrics_manager,
@@ -35,7 +35,7 @@ def create_auth_api_handler(
         enable_demo_permissions=enable_demo_permissions,
     )
     assert auth_handler.token_table == token_table
-    assert auth_handler.secrets_repo == secrets_repo
+    assert auth_handler.secrets_table == secrets_table
     assert auth_handler.google_client_id == google_client_id
     assert auth_handler.jwt_wrapper == jwt_wrapper
     assert auth_handler.metrics_manager == metrics_manager
@@ -58,10 +58,10 @@ def test_handle_login_success():
     mock_token_table = Mock(spec=RefreshTokenTable)
     mock_token_table.save_token.return_value = True
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "hey"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "hey"
 
-    handler = create_auth_api_handler(token_table=mock_token_table, secrets_repo=mock_secret_repo)
+    handler = create_auth_api_handler(token_table=mock_token_table, secrets_table=mock_secrets_table)
 
     with patch("thoughtful_backend.lambdas.auth_lambda.requests.get") as mock_requests_get:
         mock_response = Mock()
@@ -87,10 +87,10 @@ def test_handle_login_success():
 
 def test_handle_login_google_token_invalid():
     """Tests login failure when Google token has the wrong audience."""
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "hey"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "hey"
 
-    handler = create_auth_api_handler(secrets_repo=mock_secret_repo)
+    handler = create_auth_api_handler(secrets_table=mock_secrets_table)
 
     with patch("thoughtful_backend.lambdas.auth_lambda.requests.get") as mock_requests_get:
         mock_response = Mock()
@@ -110,12 +110,12 @@ def test_handle_refresh_success():
     """Tests a successful token refresh with a valid refresh token."""
     mock_token_table = Mock(spec=RefreshTokenTable)
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "hey"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "hey"
 
-    handler = create_auth_api_handler(token_table=mock_token_table, secrets_repo=mock_secret_repo)
+    handler = create_auth_api_handler(token_table=mock_token_table, secrets_table=mock_secrets_table)
 
-    refresh_token, token_id, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secret_repo)
+    refresh_token, token_id, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secrets_table)
     mock_token_table.get_token.return_value = {"userId": MOCK_USER_ID, "tokenId": token_id}
 
     event = create_mock_event("POST", "/auth/refresh", {"refreshToken": refresh_token})
@@ -134,12 +134,12 @@ def test_handle_refresh_token_not_in_db():
     mock_token_table = Mock(spec=RefreshTokenTable)
     mock_token_table.get_token.return_value = None  # Simulate token not found
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "hey"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "hey"
 
-    handler = create_auth_api_handler(token_table=mock_token_table, secrets_repo=mock_secret_repo)
+    handler = create_auth_api_handler(token_table=mock_token_table, secrets_table=mock_secrets_table)
 
-    refresh_token, _, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secret_repo)
+    refresh_token, _, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secrets_table)
     event = create_mock_event("POST", "/auth/refresh", {"refreshToken": refresh_token})
 
     response = handler.handle(event)
@@ -152,12 +152,12 @@ def test_handle_logout_success():
     """Tests a successful logout which should delete the refresh token."""
     mock_token_table = Mock(spec=RefreshTokenTable)
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "hey"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "hey"
 
-    handler = create_auth_api_handler(token_table=mock_token_table, secrets_repo=mock_secret_repo)
+    handler = create_auth_api_handler(token_table=mock_token_table, secrets_table=mock_secrets_table)
 
-    refresh_token, token_id, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secret_repo)
+    refresh_token, token_id, _ = JwtWrapper().create_refresh_token(MOCK_USER_ID, mock_secrets_table)
 
     event = create_mock_event("POST", "/auth/logout", {"refreshToken": refresh_token})
 
@@ -172,10 +172,10 @@ def test_handle_logout_with_invalid_token():
     """Tests that logout still returns a success code even if the token is invalid."""
     mock_token_table = Mock(spec=RefreshTokenTable)
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "hey"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "hey"
 
-    handler = create_auth_api_handler(token_table=mock_token_table, secrets_repo=mock_secret_repo)
+    handler = create_auth_api_handler(token_table=mock_token_table, secrets_table=mock_secrets_table)
 
     event = create_mock_event("POST", "/auth/logout", {"refreshToken": "this.is.a.bad.token"})
     response = handler.handle(event)
@@ -209,14 +209,14 @@ def test_new_user_initialization_with_demo_permissions_enabled():
 
     mock_user_permissions_table = Mock(spec=UserPermissionsTable)
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "test-key"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-key"
 
     mock_metrics_manager = Mock()
 
     handler = create_auth_api_handler(
         token_table=mock_token_table,
-        secrets_repo=mock_secret_repo,
+        secrets_table=mock_secrets_table,
         user_profile_table=mock_user_profile_table,
         user_permissions_table=mock_user_permissions_table,
         metrics_manager=mock_metrics_manager,
@@ -282,12 +282,12 @@ def test_new_user_initialization_with_demo_permissions_disabled():
 
     mock_user_permissions_table = Mock(spec=UserPermissionsTable)
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "test-key"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-key"
 
     handler = create_auth_api_handler(
         token_table=mock_token_table,
-        secrets_repo=mock_secret_repo,
+        secrets_table=mock_secrets_table,
         user_profile_table=mock_user_profile_table,
         user_permissions_table=mock_user_permissions_table,
         enable_demo_permissions=False,  # Demo disabled
@@ -333,12 +333,12 @@ def test_existing_user_not_re_initialized():
 
     mock_user_permissions_table = Mock(spec=UserPermissionsTable)
 
-    mock_secret_repo = Mock()
-    mock_secret_repo.get_jwt_secret_key.return_value = "test-key"
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-key"
 
     handler = create_auth_api_handler(
         token_table=mock_token_table,
-        secrets_repo=mock_secret_repo,
+        secrets_table=mock_secrets_table,
         user_profile_table=mock_user_profile_table,
         user_permissions_table=mock_user_permissions_table,
         enable_demo_permissions=True,  # Demo enabled but user already initialized

@@ -6,6 +6,7 @@ from pydantic import ValidationError
 
 from thoughtful_backend.cloudwatch.metrics import MetricsManager
 from thoughtful_backend.dynamodb.primm_submissions_table import PrimmSubmissionsTable
+from thoughtful_backend.dynamodb.secrets_table import SecretsTable
 from thoughtful_backend.dynamodb.throttle_table import (
     ThrottleRateLimitExceededException,
     ThrottleTable,
@@ -14,7 +15,6 @@ from thoughtful_backend.models.primm_feedback_models import (
     PrimmEvaluationRequestModel,
     PrimmEvaluationResponseModel,
 )
-from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
 from thoughtful_backend.utils.apig_utils import (
     ErrorCode,
     create_error_response,
@@ -25,6 +25,7 @@ from thoughtful_backend.utils.apig_utils import (
 )
 from thoughtful_backend.utils.aws_env_vars import (
     get_primm_submissions_table_name,
+    get_secrets_table_name,
     get_throttle_table_name,
 )
 from thoughtful_backend.utils.base_types import UserId
@@ -39,13 +40,13 @@ class PrimmFeedbackApiHandler:
     def __init__(
         self,
         throttle_table: ThrottleTable,
-        secrets_repo: SecretsRepository,
+        secrets_table: SecretsTable,
         chatbot_wrapper: ChatBotWrapper,
         primm_submissions_table: PrimmSubmissionsTable,
         metrics_manager: MetricsManager,
     ):
         self.throttle_table = throttle_table
-        self.secrets_repo = secrets_repo
+        self.secrets_table = secrets_table
         self.chatbot_wrapper = chatbot_wrapper
         self.primm_submissions_table = primm_submissions_table
         self.metrics_manager = metrics_manager
@@ -76,7 +77,7 @@ class PrimmFeedbackApiHandler:
             _LOGGER.info(f"Throttling check passed for user {user_id}. Calling ChatBot.")
 
             ai_eval_response: PrimmEvaluationResponseModel = self.chatbot_wrapper.call_primm_evaluation_api(
-                chatbot_api_key=self.secrets_repo.get_chatbot_api_key(),
+                chatbot_api_key=self.secrets_table.get_chatbot_api_key(),
                 code_snippet=request_data.codeSnippet,
                 prediction_prompt_text=request_data.userPredictionPromptText,
                 user_prediction_text=request_data.userPredictionText,
@@ -139,13 +140,13 @@ def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
     try:
         throttle_table = ThrottleTable(get_throttle_table_name())
         primm_submissions_table = PrimmSubmissionsTable(get_primm_submissions_table_name())
-        secrets_repo = SecretsRepository()
+        secrets_table = SecretsTable(get_secrets_table_name())
         chatbot_wrapper = ChatBotWrapper()
 
         api_handler = PrimmFeedbackApiHandler(
             throttle_table=throttle_table,
             primm_submissions_table=primm_submissions_table,
-            secrets_repo=secrets_repo,
+            secrets_table=secrets_table,
             chatbot_wrapper=chatbot_wrapper,
             metrics_manager=metrics_manager,
         )

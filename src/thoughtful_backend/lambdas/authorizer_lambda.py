@@ -3,9 +3,9 @@ import os
 import typing
 
 from thoughtful_backend.cloudwatch.metrics import MetricsManager
-from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
+from thoughtful_backend.dynamodb.secrets_table import SecretsTable
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
-from thoughtful_backend.utils.aws_env_vars import get_aws_region
+from thoughtful_backend.utils.aws_env_vars import get_aws_region, get_secrets_table_name
 
 _LOGGER = logging.getLogger(__name__)
 _LOGGER.setLevel(logging.INFO)
@@ -30,11 +30,11 @@ class AuthorizerLambda:
     def __init__(
         self,
         jwt_wrapper: JwtWrapper,
-        secrets_repo: SecretsRepository,
+        secrets_table: SecretsTable,
         metrics_manager: MetricsManager,
     ) -> None:
         self.jwt_wrapper = jwt_wrapper
-        self.secrets_repo = secrets_repo
+        self.secrets_table = secrets_table
         self.metrics_manager = metrics_manager
 
     def handle(self, event: dict) -> dict:
@@ -62,7 +62,7 @@ class AuthorizerLambda:
             return _generate_iam_policy("user", "Deny", resource_arn, {})
 
         try:
-            payload = self.jwt_wrapper.verify_token(token, self.secrets_repo)
+            payload = self.jwt_wrapper.verify_token(token, self.secrets_table)
 
             if payload and "sub" in payload:
                 user_id = payload["sub"]
@@ -95,7 +95,7 @@ def authorizer_lambda_handler(event: dict, context: typing.Any) -> dict:
         handler = AuthorizerLambda(
             metrics_manager=metrics_manager,
             jwt_wrapper=JwtWrapper(),
-            secrets_repo=SecretsRepository(),
+            secrets_table=SecretsTable(get_secrets_table_name()),
         )
         return handler.handle(event)
     except Exception as e:

@@ -6,10 +6,10 @@ from pydantic import ValidationError
 
 from thoughtful_backend.cloudwatch.metrics import MetricsManager
 from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
+from thoughtful_backend.dynamodb.secrets_table import SecretsTable
 from thoughtful_backend.dynamodb.user_permissions_table import UserPermissionsTable
 from thoughtful_backend.dynamodb.user_profile_table import UserProfileTable
 from thoughtful_backend.models.auth_models import LoginRequest, RefreshRequest, TokenPayload
-from thoughtful_backend.secrets_manager.secrets_repository import SecretsRepository
 from thoughtful_backend.utils.apig_utils import (
     ErrorCode,
     create_error_response,
@@ -20,6 +20,7 @@ from thoughtful_backend.utils.apig_utils import (
 from thoughtful_backend.utils.aws_env_vars import (
     get_google_client_id,
     get_refresh_token_table_name,
+    get_secrets_table_name,
     get_user_permissions_table_name,
     get_user_profile_table_name,
     is_demo_permissions_enabled,
@@ -44,7 +45,7 @@ class AuthApiHandler:
     def __init__(
         self,
         token_table: RefreshTokenTable,
-        secrets_repo: SecretsRepository,
+        secrets_table: SecretsTable,
         google_client_id: str,
         jwt_wrapper: JwtWrapper,
         metrics_manager: MetricsManager,
@@ -53,7 +54,7 @@ class AuthApiHandler:
         enable_demo_permissions: bool,
     ):
         self.token_table = token_table
-        self.secrets_repo = secrets_repo
+        self.secrets_table = secrets_table
         self.google_client_id = google_client_id
         self.jwt_wrapper = jwt_wrapper
         self.metrics_manager = metrics_manager
@@ -144,8 +145,8 @@ class AuthApiHandler:
             # Update user profile with last login timestamp
             self.user_profile_table.update_last_login(user_id)
 
-            access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_repo)
-            refresh_token, token_id, ttl = self.jwt_wrapper.create_refresh_token(user_id, self.secrets_repo)
+            access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_table)
+            refresh_token, token_id, ttl = self.jwt_wrapper.create_refresh_token(user_id, self.secrets_table)
 
             if not self.token_table.save_token(user_id, token_id, ttl):
                 self.metrics_manager.put_metric("LoginFailure", 1)
@@ -172,7 +173,7 @@ class AuthApiHandler:
     def _handle_refresh(self, event: dict) -> dict:
         try:
             body = RefreshRequest.model_validate_json(event.get("body", "{}"))
-            payload = self.jwt_wrapper.verify_token(body.refreshToken, self.secrets_repo)
+            payload = self.jwt_wrapper.verify_token(body.refreshToken, self.secrets_table)
 
             if not payload or "sub" not in payload or "jti" not in payload:
                 self.metrics_manager.put_metric("RefreshFailure", 1)
@@ -187,7 +188,7 @@ class AuthApiHandler:
                     ErrorCode.AUTHENTICATION_FAILED, "Refresh token not found or expired", event=event
                 )
 
-            new_access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_repo)
+            new_access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_table)
             self.metrics_manager.put_metric("RefreshSuccess", 1)
 
             # Note: For enhanced security, you could implement refresh token rotation here
@@ -210,7 +211,7 @@ class AuthApiHandler:
     def _handle_logout(self, event: dict) -> dict:
         try:
             body = RefreshRequest.model_validate_json(event.get("body", "{}"))
-            payload = self.jwt_wrapper.verify_token(body.refreshToken, self.secrets_repo)
+            payload = self.jwt_wrapper.verify_token(body.refreshToken, self.secrets_table)
 
             if payload and "sub" in payload and "jti" in payload:
                 user_id = UserId(payload["sub"])
@@ -245,7 +246,7 @@ def auth_lambda_handler(event: dict, context: typing.Any) -> dict:
     try:
         handler = AuthApiHandler(
             token_table=RefreshTokenTable(get_refresh_token_table_name()),
-            secrets_repo=SecretsRepository(),
+            secrets_table=SecretsTable(get_secrets_table_name()),
             google_client_id=get_google_client_id(),
             jwt_wrapper=JwtWrapper(),
             metrics_manager=metrics_manager,
