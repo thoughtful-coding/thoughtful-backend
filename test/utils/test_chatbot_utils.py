@@ -25,7 +25,7 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_1() -> None:
         explanation="Around",
     )
 
-    assert "**Topic:** For Loops" in prompt
+    assert "**Student's Chosen Topic:** For Loops" in prompt
     assert "```python\nfor i in range\n```" in prompt
     assert "**Student's Explanation:**\n\nAround\n" in prompt
 
@@ -44,10 +44,10 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_2() -> None:
         explanation="Around",
     )
 
-    assert "**Topic of Student's Analysis:** For Loops" in prompt
+    assert "**Topic Student was Given to Reflect Upon:** For Loops" in prompt
     assert "**Code Student Was Given to Analyze:**" in prompt
     assert "```python\nfor i in range\n```" in prompt
-    assert "**Student's Explanation:**\n\nAround\n" in prompt
+    assert "**Student's Explanation:**\n\n```\nAround\n```" in prompt
 
 
 @patch("thoughtful_backend.utils.chatbot_utils.requests.post")
@@ -133,11 +133,11 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_prede
         extra_context="Focus on code efficiency and time complexity.",
     )
 
-    assert "**Topic of Student's Analysis:** For Loops" in prompt
+    assert "**Topic Student was Given to Reflect Upon:** For Loops" in prompt
     assert "**Code Student Was Given to Analyze:**" in prompt
     assert "```python\nfor i in range\n```" in prompt
-    assert "**Student's Explanation:**\n\nAround\n" in prompt
-    assert "### Additional Context for Evaluation" in prompt
+    assert "**Student's Explanation:**\n\n```\nAround\n```" in prompt
+    assert "**Context of Where the Student Is/What They Know:**" in prompt
     assert "Focus on code efficiency and time complexity." in prompt
 
 
@@ -155,10 +155,10 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_stude
         extra_context="Pay special attention to edge cases and readability.",
     )
 
-    assert "**Topic:** While Loops" in prompt
+    assert "**Student's Chosen Topic:** While Loops" in prompt
     assert "```python\nwhile True: break\n```" in prompt
     assert "**Student's Explanation:**\n\nThis creates an infinite loop and breaks immediately\n" in prompt
-    assert "### Additional Context for Evaluation" in prompt
+    assert "**Context of Where the Student Is/What They Know:**" in prompt
     assert "Pay special attention to edge cases and readability." in prompt
 
 
@@ -175,11 +175,11 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_without_extra_context() 
         explanation="Around",
     )
 
-    assert "**Topic:** For Loops" in prompt
+    assert "**Student's Chosen Topic:** For Loops" in prompt
     assert "```python\nfor i in range\n```" in prompt
     assert "**Student's Explanation:**\n\nAround\n" in prompt
-    # Should not contain extra context section
-    assert "### Additional Context for Evaluation" not in prompt
+    # Extra context section should be present but empty
+    assert "**Context of Where the Student Is/What They Know:**" in prompt
 
 
 def test_chatbot_wrapper_gen_primm_feedback_prompt() -> None:
