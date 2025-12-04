@@ -23,14 +23,25 @@ class ChatBotApiError(Exception):
 
 _PREDFINED_CODE_REFLECTION_FEEDBACK_PROMPT_TEMPLATE = """
 You are an expert in programming and tutoring. Your task is to evaluate a student's
-explanation of a given piece of Python code that illustrates how a particular topic
-works. Provide short, concise, and constructive feedback and an assessment level on
-their analysis of the given piece of code. Be mindful that these students are
-learning and don't provide feedback that is beyond the level of the given example.
+explanation of a piece of code they were given. Their explanation should explain
+how the code works and how it pertains to the specific topic they were also given.
+
+Provide short, concise, and constructive feedback and an assessment level on their
+analysis of the given piece of code. Be mindful that these are students, so your
+feedback should not go beyond the scope of the topic they are trying to explain.
+Put another way, these students are learning, so ONLY give them feedback on what
+they said. Do not make suggestions that are beyond the exact topic they are
+discussing.
 
 ### Student's Submission Details
 
-**Topic of Student's Analysis:** {topic}
+**Context of Where the Student Is/What They Know:**
+
+```
+{extra_context_section}
+```
+
+**Topic Student was Given to Reflect Upon:** {topic}
 
 **Code Student Was Given to Analyze:**
 
@@ -40,9 +51,9 @@ learning and don't provide feedback that is beyond the level of the given exampl
 
 **Student's Explanation:**
 
+```
 {explanation}
-
-{extra_context_section}
+```
 
 ### Rubric for Assessment Levels
 
@@ -72,15 +83,24 @@ any other text, greetings, or conversational filler before or after the JSON.
 
 _REFLECTION_FEEDBACK_PROMPT_TEMPLATE = """
 You are an expert in programming and tutoring. Your task is to evaluate a student's self-created
-Python code example and their explanation for a chosen topic.
+"journal entry". The entry is on a topic of their choosing and contains a short Python code example
+and a short explanation of how the code works and how it pertains to their chosen topic.
 
 Provide short, concise, and constructive feedback. Your feedback should assess both the correctness
-of the code and the clarity of the explanation. Be mindful that these are students, so your feedback
-should not go too far beyond the scope of the topic they are trying to explain.
+of the code and the clarity of the explanation. Be mindful that these are students, so
+your feedback should not go beyond the scope of the topic they are trying to explain.
+Put another way, these students are learning, so ONLY give them feedback on what
+they said. Do not make suggestions that are beyond the exact topic they are discussing.
 
 ### Student's Submission Details
 
-**Topic:** {topic}
+**Context of Where the Student Is/What They Know:**
+
+```
+{extra_context_section}
+```
+
+**Student's Chosen Topic:** {topic}
 
 **Student's Code:**
 
@@ -125,7 +145,6 @@ You are an expert Python programming assistant and an encouraging educational co
 Your task is to evaluate a student's analysis of a given Python code snippet. The student has provided:
 
 - Their initial prediction (in English) about what the code will do, made before running the code.
-- Their confidence in that prediction.
 - An explanation/self-correction, written after observing the code's output.
 
 ### Student's Submission Details:
@@ -189,7 +208,7 @@ Please provide your evaluation in a strict JSON format with the following struct
 {{
     "aiPredictionAssessment": "AssessmentLevel: string",
     "aiExplanationAssessment": "AssessmentLevel: string",
-    "aiOverallComment": "Overall consolidated comment: string>"
+    "aiOverallComment": "Overall consolidated comment: string"
 }}
 ```
 
