@@ -117,3 +117,19 @@ def test_get_secret_no_secret_value_field(secrets_table: SecretsTable):
     with pytest.raises(KeyError) as exc_info:
         secrets_table.get_jwt_secret_key()
     assert "JWT_SECRET" in str(exc_info.value)
+
+
+def test_get_beta_auth_secret_exists(secrets_table: SecretsTable):
+    """Test retrieving an existing beta auth secret."""
+    # Manually insert beta authentication secret into the mock table
+    secrets_table.table.put_item(
+        Item={
+            "secretKey": "BETA_AUTH_SECRET",
+            "secretValue": "example",
+            "description": "Beta authentication secret",
+            "updatedAt": "2025-01-01T00:00:00Z",
+        }
+    )
+
+    secret_value = secrets_table.get_beta_auth_secret()
+    assert secret_value == "example"

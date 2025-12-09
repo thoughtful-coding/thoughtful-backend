@@ -90,3 +90,15 @@ class SecretsTable:
             KeyError: If the secret is not found
         """
         return self.__get_secret("JWT_SECRET")
+
+    def get_beta_auth_secret(self) -> str:
+        """
+        Gets the beta authentication secret from DynamoDB.
+
+        Returns:
+            The beta authentication secret
+
+        Raises:
+            KeyError: If the secret is not found
+        """
+        return self.__get_secret("BETA_AUTH_SECRET")

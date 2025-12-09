@@ -26,7 +26,7 @@ from thoughtful_backend.utils.aws_env_vars import (
     is_demo_permissions_enabled,
     is_test_auth_enabled,
 )
-from thoughtful_backend.utils.base_types import RefreshTokenId, UserId
+from thoughtful_backend.utils.base_types import RefreshTokenId, UserId, InstructorId
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
 
 _LOGGER = logging.getLogger(__name__)
@@ -107,7 +107,7 @@ class AuthApiHandler:
                 for student_id in DEMO_SAMPLE_STUDENTS:
                     self.user_permissions_table.grant_permission(
                         granter_user_id=UserId(student_id),
-                        grantee_user_id=user_id,
+                        grantee_user_id=InstructorId(user_id),
                         permission_type="VIEW_STUDENT_DATA_FULL",
                     )
                     _LOGGER.debug(f"Granted permission for {user_id} to view {student_id}")
@@ -115,7 +115,7 @@ class AuthApiHandler:
                 # Grant permission to view own data in instructor dashboard
                 self.user_permissions_table.grant_permission(
                     granter_user_id=user_id,
-                    grantee_user_id=user_id,
+                    grantee_user_id=InstructorId(user_id),
                     permission_type="VIEW_STUDENT_DATA_FULL",
                 )
                 _LOGGER.info(f"Granted demo permissions to new user {user_id}")
@@ -240,7 +240,7 @@ class AuthApiHandler:
             body = TestLoginRequest.model_validate_json(event.get("body", "{}"))
 
             # Validate the shared secret
-            expected_secret = self.secrets_table.get_secret("BETA_AUTH_SECRET")
+            expected_secret = self.secrets_table.get_beta_auth_secret()
             if not expected_secret or body.testAuthSecret != expected_secret:
                 _LOGGER.warning(f"TEST AUTH LOGIN FAILED: Invalid secret provided for user '{body.testUserId}'")
                 self.metrics_manager.put_metric("TestLoginFailure", 1)

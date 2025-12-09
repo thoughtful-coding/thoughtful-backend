@@ -407,7 +407,7 @@ def test_test_login_success_when_enabled():
 
     mock_secrets_table = Mock()
     mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
-    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+    mock_secrets_table.get_beta_auth_secret.return_value = MOCK_BETA_AUTH_SECRET
 
     mock_metrics_manager = Mock()
 
@@ -455,7 +455,7 @@ def test_test_login_creates_valid_tokens_for_authorizer():
 
     mock_secrets_table = Mock()
     mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
-    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+    mock_secrets_table.get_beta_auth_secret.return_value = MOCK_BETA_AUTH_SECRET
 
     jwt_wrapper = JwtWrapper()
 
@@ -492,7 +492,7 @@ def test_test_login_returns_401_for_invalid_secret():
     """Tests that /auth/test-login returns 401 for invalid testAuthSecret."""
     mock_secrets_table = Mock()
     mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
-    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+    mock_secrets_table.get_beta_auth_secret.return_value = MOCK_BETA_AUTH_SECRET
 
     mock_metrics_manager = Mock()
 
@@ -517,7 +517,7 @@ def test_test_login_returns_401_for_missing_secret():
     """Tests that /auth/test-login returns generic 401 when testAuthSecret is missing."""
     mock_secrets_table = Mock()
     mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
-    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+    mock_secrets_table.get_beta_auth_secret.return_value = MOCK_BETA_AUTH_SECRET
 
     mock_metrics_manager = Mock()
 
