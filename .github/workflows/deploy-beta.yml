@@ -1,0 +1,63 @@
+name: Deploy Beta Stack
+
+# This workflow triggers the CDK deployment for the beta environment.
+# The beta environment is deployed to us-east-1 with ENABLE_TEST_AUTH=true,
+# allowing Playwright E2E tests to authenticate without Google OAuth.
+
+on:
+  workflow_dispatch:
+    inputs:
+      image_tag:
+        description: 'Docker image tag to deploy (leave empty to use latest from main)'
+        required: false
+        type: string
+
+jobs:
+  trigger-beta-deploy:
+    name: Trigger Beta CDK Deployment
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Determine image tag
+        id: image-tag
+        run: |
+          if [ -n "${{ inputs.image_tag }}" ]; then
+            echo "IMAGE_TAG=${{ inputs.image_tag }}" >> $GITHUB_OUTPUT
+            echo "Using provided image tag: ${{ inputs.image_tag }}"
+          else
+            # Use the short SHA of the current commit
+            # This works because deploy.yml pushes the SHA-tagged image to both ECR regions
+            SHORT_SHA="${GITHUB_SHA:0:8}"
+            echo "IMAGE_TAG=${SHORT_SHA}" >> $GITHUB_OUTPUT
+            echo "Using current commit SHA as image tag: ${SHORT_SHA}"
+          fi
+
+      - name: Trigger Beta Infrastructure Deployment
+        env:
+          IMAGE_TAG: ${{ steps.image-tag.outputs.IMAGE_TAG }}
+        run: |
+          if [ -z "${IMAGE_TAG}" ]; then
+            echo "Error: IMAGE_TAG is not defined. Cannot trigger beta deployment."
+            exit 1
+          fi
+
+          echo "Triggering beta infrastructure deployment with IMAGE_TAG=${IMAGE_TAG}"
+
+          if [ -n "${{ secrets.INFRA_REPO_TOKEN }}" ]; then
+            curl --request POST \
+                 --fail \
+                 --url "https://api.github.com/repos/${{ secrets.INFRA_REPO_OWNER }}/${{ secrets.INFRA_REPO_NAME }}/dispatches" \
+                 --header "Accept: application/vnd.github.v3+json" \
+                 --header "Authorization: Bearer ${{ secrets.INFRA_REPO_TOKEN }}" \
+                 --data "{\"event_type\":\"beta-deployed\",\"client_payload\":{\"imageTag\":\"${IMAGE_TAG}\",\"stage\":\"beta\"}}"
+            echo "Beta CDK workflow triggered successfully with imageTag=${IMAGE_TAG}, stage=beta"
+          else
+            echo "Error: INFRA_REPO_TOKEN not set. Cannot trigger beta deployment."
+            echo "Required secrets:"
+            echo "  - INFRA_REPO_TOKEN: GitHub Personal Access Token with 'repo' scope"
+            echo "  - INFRA_REPO_OWNER: thoughtful-coding"
+            echo "  - INFRA_REPO_NAME: thoughtful-deploy-cdk"
+            exit 1
+          fi

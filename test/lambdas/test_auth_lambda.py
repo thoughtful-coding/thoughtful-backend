@@ -11,6 +11,7 @@ from thoughtful_backend.utils.jwt_utils import JwtWrapper
 MOCK_SECRET_KEY = "test-secret-key-for-jwt"
 MOCK_GOOGLE_CLIENT_ID = "test-google-client-id.apps.googleusercontent.com"
 MOCK_USER_ID = UserId("12345_google_user_sub")
+MOCK_BETA_AUTH_SECRET = "test-beta-auth-secret-12345"
 
 
 def create_auth_api_handler(
@@ -22,6 +23,7 @@ def create_auth_api_handler(
     user_profile_table=Mock(spec=UserProfileTable),
     user_permissions_table=Mock(spec=UserPermissionsTable),
     enable_demo_permissions=False,
+    enable_test_auth=False,
 ) -> AuthApiHandler:
     """Creates an instance of the handler with mocked dependencies."""
     auth_handler = AuthApiHandler(
@@ -33,6 +35,7 @@ def create_auth_api_handler(
         user_profile_table=user_profile_table,
         user_permissions_table=user_permissions_table,
         enable_demo_permissions=enable_demo_permissions,
+        enable_test_auth=enable_test_auth,
     )
     assert auth_handler.token_table == token_table
     assert auth_handler.secrets_table == secrets_table
@@ -42,6 +45,7 @@ def create_auth_api_handler(
     assert auth_handler.user_profile_table == user_profile_table
     assert auth_handler.user_permissions_table == user_permissions_table
     assert auth_handler.enable_demo_permissions == enable_demo_permissions
+    assert auth_handler.enable_test_auth == enable_test_auth
     return auth_handler
 
 
@@ -371,3 +375,187 @@ def test_existing_user_not_re_initialized():
 
         # Verify NO permissions were granted
         mock_user_permissions_table.grant_permission.assert_not_called()
+
+
+# ============================================================================
+# Test Auth (Beta Environment Only) Tests
+# ============================================================================
+
+
+def test_test_login_returns_404_when_disabled():
+    """Tests that /auth/test-login returns 404 when ENABLE_TEST_AUTH is false (production behavior)."""
+    handler = create_auth_api_handler(enable_test_auth=False)
+
+    event = create_mock_event(
+        "POST", "/auth/test-login", {"testUserId": "e2e-test@playwright.local", "testAuthSecret": MOCK_BETA_AUTH_SECRET}
+    )
+    response = handler.handle(event)
+
+    assert response["statusCode"] == 404
+    body = json.loads(response["body"])
+    assert "not found" in body["message"].lower()
+
+
+def test_test_login_success_when_enabled():
+    """Tests that /auth/test-login returns valid tokens when ENABLE_TEST_AUTH is true (beta environment)."""
+    mock_token_table = Mock(spec=RefreshTokenTable)
+    mock_token_table.save_token.return_value = True
+
+    mock_user_profile_table = Mock(spec=UserProfileTable)
+    mock_user_profile_table.is_user_initialized.return_value = True  # Simulate existing user
+    mock_user_profile_table.update_last_login.return_value = True
+
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
+    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+
+    mock_metrics_manager = Mock()
+
+    handler = create_auth_api_handler(
+        token_table=mock_token_table,
+        secrets_table=mock_secrets_table,
+        user_profile_table=mock_user_profile_table,
+        metrics_manager=mock_metrics_manager,
+        enable_test_auth=True,  # Beta environment
+    )
+
+    test_user_id = "e2e-test@playwright.local"
+    event = create_mock_event(
+        "POST", "/auth/test-login", {"testUserId": test_user_id, "testAuthSecret": MOCK_BETA_AUTH_SECRET}
+    )
+    response = handler.handle(event)
+
+    # Verify login succeeded
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+    assert "accessToken" in body
+    assert "refreshToken" in body
+
+    # Verify tokens are valid JWTs (have 3 parts separated by dots)
+    assert len(body["accessToken"].split(".")) == 3
+    assert len(body["refreshToken"].split(".")) == 3
+
+    # Verify refresh token was saved
+    mock_token_table.save_token.assert_called_once()
+
+    # Verify last login was updated with the test user ID
+    mock_user_profile_table.update_last_login.assert_called_once_with(UserId(test_user_id))
+
+    # Verify success metric was emitted
+    mock_metrics_manager.put_metric.assert_any_call("TestLoginSuccess", 1)
+
+
+def test_test_login_creates_valid_tokens_for_authorizer():
+    """Tests that tokens from test-login can be verified by the JWT wrapper."""
+    mock_token_table = Mock(spec=RefreshTokenTable)
+    mock_token_table.save_token.return_value = True
+
+    mock_user_profile_table = Mock(spec=UserProfileTable)
+    mock_user_profile_table.is_user_initialized.return_value = True
+
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
+    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+
+    jwt_wrapper = JwtWrapper()
+
+    handler = create_auth_api_handler(
+        token_table=mock_token_table,
+        secrets_table=mock_secrets_table,
+        user_profile_table=mock_user_profile_table,
+        jwt_wrapper=jwt_wrapper,
+        enable_test_auth=True,
+    )
+
+    test_user_id = "e2e-test@playwright.local"
+    event = create_mock_event(
+        "POST", "/auth/test-login", {"testUserId": test_user_id, "testAuthSecret": MOCK_BETA_AUTH_SECRET}
+    )
+    response = handler.handle(event)
+
+    assert response["statusCode"] == 200
+    body = json.loads(response["body"])
+
+    # Verify the access token can be decoded and contains the correct user ID
+    decoded_payload = jwt_wrapper.verify_token(body["accessToken"], mock_secrets_table)
+    assert decoded_payload is not None
+    assert decoded_payload["sub"] == test_user_id
+
+    # Verify the refresh token can be decoded and contains the correct user ID
+    decoded_refresh = jwt_wrapper.verify_token(body["refreshToken"], mock_secrets_table)
+    assert decoded_refresh is not None
+    assert decoded_refresh["sub"] == test_user_id
+    assert "jti" in decoded_refresh  # Refresh tokens have a unique ID
+
+
+def test_test_login_returns_401_for_invalid_secret():
+    """Tests that /auth/test-login returns 401 for invalid testAuthSecret."""
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
+    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+
+    mock_metrics_manager = Mock()
+
+    handler = create_auth_api_handler(
+        secrets_table=mock_secrets_table,
+        metrics_manager=mock_metrics_manager,
+        enable_test_auth=True,
+    )
+
+    event = create_mock_event(
+        "POST", "/auth/test-login", {"testUserId": "e2e-test@playwright.local", "testAuthSecret": "wrong-secret"}
+    )
+    response = handler.handle(event)
+
+    assert response["statusCode"] == 401
+    body = json.loads(response["body"])
+    assert body["message"] == "Unauthorized"
+    mock_metrics_manager.put_metric.assert_any_call("TestLoginFailure", 1)
+
+
+def test_test_login_returns_401_for_missing_secret():
+    """Tests that /auth/test-login returns generic 401 when testAuthSecret is missing."""
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
+    mock_secrets_table.get_secret.return_value = MOCK_BETA_AUTH_SECRET
+
+    mock_metrics_manager = Mock()
+
+    handler = create_auth_api_handler(
+        secrets_table=mock_secrets_table,
+        metrics_manager=mock_metrics_manager,
+        enable_test_auth=True,
+    )
+
+    # Missing testAuthSecret field
+    event = create_mock_event("POST", "/auth/test-login", {"testUserId": "e2e-test@playwright.local"})
+    response = handler.handle(event)
+
+    # Should return generic 401, not reveal that a field is missing
+    assert response["statusCode"] == 401
+    body = json.loads(response["body"])
+    assert body["message"] == "Unauthorized"
+    mock_metrics_manager.put_metric.assert_any_call("TestLoginFailure", 1)
+
+
+def test_test_login_returns_401_for_empty_body():
+    """Tests that /auth/test-login returns generic 401 for empty request body."""
+    mock_secrets_table = Mock()
+    mock_secrets_table.get_jwt_secret_key.return_value = "test-jwt-secret"
+
+    mock_metrics_manager = Mock()
+
+    handler = create_auth_api_handler(
+        secrets_table=mock_secrets_table,
+        metrics_manager=mock_metrics_manager,
+        enable_test_auth=True,
+    )
+
+    event = create_mock_event("POST", "/auth/test-login", {})
+    response = handler.handle(event)
+
+    # Should return generic 401, not reveal field requirements
+    assert response["statusCode"] == 401
+    body = json.loads(response["body"])
+    assert body["message"] == "Unauthorized"
+    mock_metrics_manager.put_metric.assert_any_call("TestLoginFailure", 1)

@@ -9,7 +9,7 @@ from thoughtful_backend.dynamodb.refresh_token_table import RefreshTokenTable
 from thoughtful_backend.dynamodb.secrets_table import SecretsTable
 from thoughtful_backend.dynamodb.user_permissions_table import UserPermissionsTable
 from thoughtful_backend.dynamodb.user_profile_table import UserProfileTable
-from thoughtful_backend.models.auth_models import LoginRequest, RefreshRequest, TokenPayload
+from thoughtful_backend.models.auth_models import LoginRequest, RefreshRequest, TestLoginRequest, TokenPayload
 from thoughtful_backend.utils.apig_utils import (
     ErrorCode,
     create_error_response,
@@ -24,6 +24,7 @@ from thoughtful_backend.utils.aws_env_vars import (
     get_user_permissions_table_name,
     get_user_profile_table_name,
     is_demo_permissions_enabled,
+    is_test_auth_enabled,
 )
 from thoughtful_backend.utils.base_types import RefreshTokenId, UserId
 from thoughtful_backend.utils.jwt_utils import JwtWrapper
@@ -52,6 +53,7 @@ class AuthApiHandler:
         user_profile_table: UserProfileTable,
         user_permissions_table: UserPermissionsTable,
         enable_demo_permissions: bool,
+        enable_test_auth: bool = False,
     ):
         self.token_table = token_table
         self.secrets_table = secrets_table
@@ -61,6 +63,7 @@ class AuthApiHandler:
         self.user_profile_table = user_profile_table
         self.user_permissions_table = user_permissions_table
         self.enable_demo_permissions = enable_demo_permissions
+        self.enable_test_auth = enable_test_auth
 
     def _verify_google_token(self, token: str) -> typing.Optional[dict]:
         try:
@@ -224,6 +227,60 @@ class AuthApiHandler:
             _LOGGER.error(f"Logout error: {e}", exc_info=True)
             return format_lambda_response(200, {"message": "Logout completed"})
 
+    def _handle_test_login(self, event: dict) -> dict:
+        """
+        Test login endpoint for Playwright E2E tests.
+        Only available when ENABLE_TEST_AUTH=true (beta environment only).
+        Requires BETA_AUTH_SECRET to be set in SecretsTable.
+        """
+        if not self.enable_test_auth:
+            return create_error_response(ErrorCode.RESOURCE_NOT_FOUND, "Route not found", event=event)
+
+        try:
+            body = TestLoginRequest.model_validate_json(event.get("body", "{}"))
+
+            # Validate the shared secret
+            expected_secret = self.secrets_table.get_secret("BETA_AUTH_SECRET")
+            if not expected_secret or body.testAuthSecret != expected_secret:
+                _LOGGER.warning(f"TEST AUTH LOGIN FAILED: Invalid secret provided for user '{body.testUserId}'")
+                self.metrics_manager.put_metric("TestLoginFailure", 1)
+                return create_error_response(ErrorCode.AUTHENTICATION_FAILED, "Unauthorized", event=event)
+
+            user_id = UserId(body.testUserId)
+
+            _LOGGER.warning(
+                f"TEST AUTH LOGIN: User '{user_id}' authenticated via test endpoint (bypassing Google OAuth)"
+            )
+
+            # Update user profile with last login timestamp
+            self.user_profile_table.update_last_login(user_id)
+
+            # Create tokens same as regular login
+            access_token = self.jwt_wrapper.create_access_token(user_id, self.secrets_table)
+            refresh_token, token_id, ttl = self.jwt_wrapper.create_refresh_token(user_id, self.secrets_table)
+
+            if not self.token_table.save_token(user_id, token_id, ttl):
+                self.metrics_manager.put_metric("TestLoginFailure", 1)
+                return create_error_response(ErrorCode.INTERNAL_ERROR, "Could not save session", event=event)
+
+            # Initialize new user with demo permissions if needed
+            self._initialize_new_user_if_needed(user_id)
+
+            self.metrics_manager.put_metric("TestLoginSuccess", 1)
+            return format_lambda_response(
+                200, TokenPayload(accessToken=access_token, refreshToken=refresh_token).model_dump(by_alias=True)
+            )
+
+        except ValidationError as e:
+            # Return generic 401 to avoid revealing field requirements
+            _LOGGER.warning(f"Test login validation error: {e}")
+            self.metrics_manager.put_metric("TestLoginFailure", 1)
+            return create_error_response(ErrorCode.AUTHENTICATION_FAILED, "Unauthorized", event=event)
+        except Exception as e:
+            _LOGGER.error(f"Test login error: {e}", exc_info=True)
+            self.metrics_manager.put_metric("TestLoginFailure", 1)
+            return create_error_response(ErrorCode.INTERNAL_ERROR, event=event)
+
     def handle(self, event: dict) -> dict:
         path = get_path(event)
         method = get_method(event)
@@ -235,6 +292,8 @@ class AuthApiHandler:
                 return self._handle_refresh(event)
             if path == "/auth/logout":
                 return self._handle_logout(event)
+            if path == "/auth/test-login":
+                return self._handle_test_login(event)
 
         return create_error_response(ErrorCode.RESOURCE_NOT_FOUND, "Auth route not found", event=event)
 
@@ -253,6 +312,7 @@ def auth_lambda_handler(event: dict, context: typing.Any) -> dict:
             user_profile_table=UserProfileTable(get_user_profile_table_name()),
             user_permissions_table=UserPermissionsTable(get_user_permissions_table_name()),
             enable_demo_permissions=is_demo_permissions_enabled(),
+            enable_test_auth=is_test_auth_enabled(),
         )
         return handler.handle(event)
     except Exception as e:

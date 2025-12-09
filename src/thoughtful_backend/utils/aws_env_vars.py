@@ -58,4 +58,14 @@ def is_demo_permissions_enabled() -> bool:
     Defaults to False if not set or invalid value.
     """
     value = os.environ.get("ENABLE_DEMO_PERMISSIONS", "false").lower()
-    return value in ("true", "1", "yes")
+    return value == "true"
+
+
+def is_test_auth_enabled() -> bool:
+    """
+    Checks if test authentication bypass is enabled (for Playwright E2E tests).
+    This should ONLY be enabled in the beta environment, never in production.
+    Defaults to False if not set or invalid value.
+    """
+    value = os.environ.get("ENABLE_TEST_AUTH", "false").lower()
+    return value == "true"

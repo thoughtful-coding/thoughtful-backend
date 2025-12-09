@@ -11,7 +11,8 @@ on:
 env:
   PYTHONPATH: ${{ github.workspace }}/src
   AWS_ACCOUNT_ID: 598791268315
-  AWS_REGION: us-west-1
+  AWS_REGION_PROD: us-west-1
+  AWS_REGION_BETA: us-east-1
   ECR_REPOSITORY: thoughtful-coding/backend
 
 jobs:
@@ -87,14 +88,24 @@ jobs:
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
 
-      - name: Configure AWS credentials
+      - name: Configure AWS credentials (Production - us-west-1)
         uses: aws-actions/configure-aws-credentials@v4
         with:
           role-to-assume: arn:aws:iam::598791268315:role/GitHubActionsECRRole
-          aws-region: us-west-1
+          aws-region: ${{ env.AWS_REGION_PROD }}
 
-      - name: Login to Amazon ECR
-        id: login-ecr
+      - name: Login to Amazon ECR (Production - us-west-1)
+        id: login-ecr-prod
+        uses: aws-actions/amazon-ecr-login@v2
+
+      - name: Configure AWS credentials (Beta - us-east-1)
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          role-to-assume: arn:aws:iam::598791268315:role/GitHubActionsECRRole
+          aws-region: ${{ env.AWS_REGION_BETA }}
+
+      - name: Login to Amazon ECR (Beta - us-east-1)
+        id: login-ecr-beta
         uses: aws-actions/amazon-ecr-login@v2
 
       - name: Set image tag
@@ -108,15 +119,15 @@ jobs:
           push: false
           load: true
           tags: |
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
-            ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:prod
-          cache-from: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache
-          cache-to: type=registry,ref=${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache,mode=max
+            ${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
+            ${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:prod
+          cache-from: type=registry,ref=${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache
+          cache-to: type=registry,ref=${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:buildcache,mode=max
 
       - name: Run Trivy vulnerability scanner
         uses: aquasecurity/trivy-action@master
         with:
-          image-ref: ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
+          image-ref: ${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
           format: "sarif"
           output: "trivy-results.sarif"
           severity: "CRITICAL,HIGH"
@@ -128,10 +139,21 @@ jobs:
         with:
           sarif_file: "trivy-results.sarif"
 
-      - name: Push Docker image to ECR
+      - name: Push Docker image to ECR (Production - us-west-1)
         run: |
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
-          docker push ${{ steps.login-ecr.outputs.registry }}/${{ env.ECR_REPOSITORY }}:prod
+          docker push ${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
+          docker push ${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:prod
+
+      - name: Tag and push Docker image to ECR (Beta - us-east-1)
+        run: |
+          # Tag the image for beta ECR registry
+          docker tag ${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }} \
+            ${{ steps.login-ecr-beta.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
+          docker tag ${{ steps.login-ecr-prod.outputs.registry }}/${{ env.ECR_REPOSITORY }}:prod \
+            ${{ steps.login-ecr-beta.outputs.registry }}/${{ env.ECR_REPOSITORY }}:beta
+          # Push to beta ECR
+          docker push ${{ steps.login-ecr-beta.outputs.registry }}/${{ env.ECR_REPOSITORY }}:${{ steps.vars.outputs.short_sha }}
+          docker push ${{ steps.login-ecr-beta.outputs.registry }}/${{ env.ECR_REPOSITORY }}:beta
 
     outputs:
       image_tag: ${{ steps.vars.outputs.short_sha }}
