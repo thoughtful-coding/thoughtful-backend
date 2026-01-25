@@ -1,6 +1,16 @@
-# Thoughtful Python Backend
+# Thoughtful Coding Backend
 
-Backend API for the Thoughtful Python learning platform.
+Backend API for the Thoughtful Coding learning platform — a serverless REST API built on AWS Lambda, API Gateway, and DynamoDB. Handles user authentication (Google OAuth), progress tracking, AI-powered feedback on student code submissions (PRIMM and Reflection sections), and an instructor portal.
+
+**Live site:** https://thoughtful-coding.github.io/ | **Project:** https://github.com/thoughtful-coding
+
+## Related Repositories
+
+| Repository | Description |
+|------------|-------------|
+| [thoughtful-coding.github.io](https://github.com/thoughtful-coding/thoughtful-coding.github.io) | React frontend (deployed to GitHub Pages) |
+| [thoughtful-backend](https://github.com/thoughtful-coding/thoughtful-backend) | Python Lambda handlers (this repo) |
+| [thoughtful-deploy-cdk](https://github.com/thoughtful-coding/thoughtful-deploy-cdk) | AWS CDK infrastructure |
 
 ## Development Setup
 
@@ -31,7 +41,7 @@ To enable automatic CDK deployment after Docker image is built, configure these 
   - Resource owner: `thoughtful-coding` (organization)
   - Repository access: Only select repositories → `thoughtful-deploy-cdk`
   - Repository permissions:
-    - **Contents**: Read (required for repository_dispatch)
+    - **Contents**: Read (required for repository dispatch)
     - **Metadata**: Read (automatically included)
   - Note: May require organization approval depending on your org settings
 
