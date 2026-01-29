@@ -259,7 +259,9 @@ class ChatBotWrapper:
         :return: Parsed JSON response from the AI
         :raises ChatBotApiError: If the API call fails or returns invalid data
         """
-        api_endpoint = f"https://generativelanguage.googleapis.com/v1/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
+        api_endpoint = (
+            f"https://generativelanguage.googleapis.com/v1/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
+        )
         request_payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
