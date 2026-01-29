@@ -12,7 +12,7 @@ from thoughtful_backend.utils.input_validator import InputValidator
 _LOGGER = logging.getLogger()
 _LOGGER.setLevel(logging.INFO)
 
-CHATBOT_MODEL = "gemini-2.0-flash"
+CHATBOT_MODEL = "gemini-2.5-flash"
 
 
 class ChatBotApiError(Exception):
@@ -259,7 +259,7 @@ class ChatBotWrapper:
         :return: Parsed JSON response from the AI
         :raises ChatBotApiError: If the API call fails or returns invalid data
         """
-        api_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
+        api_endpoint = f"https://generativelanguage.googleapis.com/v1/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
         request_payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
