@@ -259,14 +259,13 @@ class ChatBotWrapper:
         :return: Parsed JSON response from the AI
         :raises ChatBotApiError: If the API call fails or returns invalid data
         """
-        api_endpoint = (
-            f"https://generativelanguage.googleapis.com/v1/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
-        )
+        api_endpoint = f"https://generativelanguage.googleapis.com/v1beta/models/{CHATBOT_MODEL}:generateContent?key={chatbot_api_key}"
         request_payload = {
             "contents": [{"parts": [{"text": prompt}]}],
             "generationConfig": {
-                "maxOutputTokens": 200,  # Limit output size
+                "maxOutputTokens": 1024,
                 "temperature": 0.3,  # Lower = more consistent, less creative
+                "thinkingConfig": {"thinkingBudget": 0},
             },
             "safetySettings": [
                 {
@@ -515,3 +514,31 @@ class ChatBotWrapper:
         except (pydantic.ValidationError, ValueError) as e:
             _LOGGER.error(f"Error parsing API response: {e}. Raw data: {generated_dict}", exc_info=True)
             raise ValueError(f"Invalid or unexpected response structure from AI for PRIMM: {str(e)}")
+
+
+# Script used for testing the the ChatBot integration prior to deployment
+# 1. source .venv/bin/activate
+# 2. CHATBOT_API_KEY=your_key_here PYTHONPATH=$(pwd)/src python3 -m thoughtful_backend.utils.chatbot_utils
+if __name__ == "__main__":
+    import os
+    import sys
+
+    api_key = os.environ.get("CHATBOT_API_KEY")
+    if not api_key:
+        print("Set CHATBOT_API_KEY environment variable first")
+        sys.exit(1)
+
+    wrapper = ChatBotWrapper()
+    result = wrapper.call_reflection_api(
+        chatbot_api_key=api_key,
+        topic="Using for loops to iterate over a list",
+        is_topic_predefined=False,
+        code='fruits = ["apple", "banana", "cherry"]\nfor fruit in fruits:\n    print(fruit)',
+        is_code_predefined=False,
+        explanation="This code creates a list of three fruits and uses a for loop to go through each one. "
+        "On each iteration, the variable 'fruit' takes the value of the next item in the list, "
+        "and print() displays it. As seen in the example, the loop runs three times because "
+        "there are three elements in the list.",
+    )
+    print(f"aiFeedback: {result.aiFeedback}")
+    print(f"aiAssessment: {result.aiAssessment}")
