@@ -38,7 +38,7 @@ class ChatBotWrapper:
     Supports multiple providers (Gemini, Claude) with a consistent interface.
     """
 
-    MAX_FEEDBACK_LENGTH = 500
+    MAX_FEEDBACK_LENGTH = 1000
 
     def __init__(self, provider: ChatBotProvider, api_key: str) -> None:
         self.provider = provider

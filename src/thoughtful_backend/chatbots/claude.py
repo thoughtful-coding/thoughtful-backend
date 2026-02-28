@@ -41,7 +41,7 @@ def call_claude_api(
             model=CLAUDE_MODEL,
             max_tokens=2048,
             temperature=0.3,
-            system="Be concise. Limit feedback to 2-3 sentences.",
+            system="Be concise. Limit each feedback field to 2-3 sentences and under 500 characters.",
             messages=[{"role": "user", "content": prompt}],
         )
 

@@ -242,7 +242,7 @@ def test_output_validation_blocks_excessive_feedback(mock_anthropic_class):
     mock_client = Mock()
     mock_anthropic_class.return_value = mock_client
 
-    excessive_feedback = "This is feedback. " * 50  # ~900 chars
+    excessive_feedback = "This is feedback. " * 100  # ~1800 chars
 
     mock_message = Mock()
     mock_content_block = Mock()
