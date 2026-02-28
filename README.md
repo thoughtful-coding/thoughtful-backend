@@ -54,8 +54,8 @@ To enable automatic CDK deployment after Docker image is built, configure these 
 ### Workflow Trigger Flow
 
 1. Push to `main` → Backend workflow builds Docker image
-2. Image pushed to ECR with tags: `<commit-sha>` and `prod`
-3. Backend workflow triggers CDK workflow via `repository_dispatch`
-4. CDK workflow deploys Lambda functions with the new image tag
+2. Image pushed to ECR in both regions (us-east-1 and us-west-1)
+3. Backend workflow triggers CDK workflow via `repository_dispatch` (`beta-deployed`)
+4. CDK workflow deploys to beta automatically, then prod after manual approval
 
-See `.github/workflows/deploy.yml` for full workflow details.
+See [thoughtful-deploy-cdk README](https://github.com/thoughtful-coding/thoughtful-deploy-cdk) for the full deployment pipeline.

@@ -173,17 +173,17 @@ jobs:
             exit 1
           fi
 
-          echo "Triggering infrastructure pipeline for main branch with IMAGE_TAG=${IMAGE_TAG}"
+          echo "Triggering beta deployment pipeline with IMAGE_TAG=${IMAGE_TAG}"
 
-          # Trigger GitHub CDK repository (repository_dispatch)
+          # Trigger CDK repo to deploy beta first, then prod (with approval gate)
           if [ -n "${{ secrets.INFRA_REPO_TOKEN }}" ]; then
             curl --request POST \
                  --fail \
                  --url "https://api.github.com/repos/${{ secrets.INFRA_REPO_OWNER }}/${{ secrets.INFRA_REPO_NAME }}/dispatches" \
                  --header "Accept: application/vnd.github.v3+json" \
                  --header "Authorization: Bearer ${{ secrets.INFRA_REPO_TOKEN }}" \
-                 --data "{\"event_type\":\"backend-deployed\",\"client_payload\":{\"imageTag\":\"${IMAGE_TAG}\"}}"
-            echo "GitHub CDK workflow triggered successfully with imageTag=${IMAGE_TAG}"
+                 --data "{\"event_type\":\"beta-deployed\",\"client_payload\":{\"imageTag\":\"${IMAGE_TAG}\"}}"
+            echo "CDK beta deployment triggered successfully with imageTag=${IMAGE_TAG}"
           else
             echo "Warning: INFRA_REPO_TOKEN not set. Skipping CDK deployment trigger."
             echo "To enable automatic CDK deployment, set the following secrets:"
