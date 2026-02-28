@@ -27,7 +27,7 @@ class InputValidator:
         "explanation": 2000,
         "extra_context": 1000,
         "prediction": 1000,
-        "output_summary": 500,
+        "output_summary": 2000,
     }
 
     # Maximum number of markdown headers (prevents section injection)

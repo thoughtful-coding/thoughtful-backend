@@ -136,6 +136,7 @@ class ChatBotWrapper:
             extra_context=extra_context,
         )
         generated_dict = self._call_api(prompt=prompt, timeout_seconds=45)
+        _LOGGER.info(f"Raw reflection API response: {generated_dict}")
 
         try:
             feedback = ChatBotFeedback(**generated_dict)
@@ -204,6 +205,7 @@ class ChatBotWrapper:
             actual_output_summary=actual_output_summary,
         )
         generated_dict = self._call_api(prompt=prompt, timeout_seconds=60)
+        _LOGGER.info(f"Raw PRIMM API response: {generated_dict}")
 
         try:
             response = PrimmEvaluationResponseModel.model_validate(generated_dict)

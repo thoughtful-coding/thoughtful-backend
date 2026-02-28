@@ -200,6 +200,47 @@ class TestInputValidatorEdgeCases:
         InputValidator.validate_field(multiline, "explanation")
 
 
+class TestInputValidatorLimitsDocumented:
+    """
+    Central reference for all validation limits.
+    If a limit changes, update this test — it ensures limits are intentional and discoverable.
+    """
+
+    def test_input_max_lengths(self):
+        """All input field length limits in one place."""
+        assert InputValidator.MAX_LENGTHS == {
+            "topic": 200,
+            "code": 5000,
+            "explanation": 2000,
+            "extra_context": 1000,
+            "prediction": 1000,
+            "output_summary": 2000,
+        }
+
+    def test_output_max_length(self):
+        """AI output length limit."""
+        from thoughtful_backend.chatbots.wrapper import ChatBotWrapper
+
+        assert ChatBotWrapper.MAX_FEEDBACK_LENGTH == 1000
+
+    def test_all_input_fields_have_length_limits(self):
+        """Every field type used in validate_primm_input and validate_reflection_input has a limit."""
+        required_fields = {"topic", "code", "explanation", "extra_context", "prediction", "output_summary"}
+        assert required_fields == set(InputValidator.MAX_LENGTHS.keys())
+
+    def test_each_field_rejects_over_limit(self):
+        """Every field in MAX_LENGTHS is actually enforced."""
+        for field_name, max_length in InputValidator.MAX_LENGTHS.items():
+            text = "a" * (max_length + 1)
+            with pytest.raises(SuspiciousInputError, match="exceeds maximum length"):
+                InputValidator.validate_field(text, field_name)
+
+    def test_each_field_accepts_at_limit(self):
+        """Every field in MAX_LENGTHS accepts input at exactly the limit."""
+        for field_name, max_length in InputValidator.MAX_LENGTHS.items():
+            InputValidator.validate_field("a" * max_length, field_name)
+
+
 class TestInputValidatorSanitization:
     """Test log sanitization utility"""
 
