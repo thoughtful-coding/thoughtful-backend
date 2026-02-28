@@ -67,17 +67,29 @@ class SecretsTable:
             _LOGGER.error(f"Error retrieving secret {secret_key}: {e}")
             raise KeyError(f"Failed to retrieve secret '{secret_key}' from DynamoDB") from e
 
-    def get_chatbot_api_key(self) -> str:
+    def get_gemini_api_key(self) -> str:
         """
-        Gets the ChatBot API key from DynamoDB.
+        Gets the Gemini API key from DynamoDB.
 
         Returns:
-            The ChatBot API key
+            The Gemini API key
 
         Raises:
             KeyError: If the secret is not found
         """
-        return self.__get_secret("CHATBOT_API_KEY")
+        return self.__get_secret("GEMINI_API_KEY")
+
+    def get_claude_api_key(self) -> str:
+        """
+        Gets the Claude API key from DynamoDB.
+
+        Returns:
+            The Claude API key
+
+        Raises:
+            KeyError: If the secret is not found
+        """
+        return self.__get_secret("CLAUDE_API_KEY")
 
     def get_jwt_secret_key(self) -> str:
         """

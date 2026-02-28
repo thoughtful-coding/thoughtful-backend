@@ -29,7 +29,7 @@ from thoughtful_backend.utils.aws_env_vars import (
     get_throttle_table_name,
 )
 from thoughtful_backend.utils.base_types import UserId
-from thoughtful_backend.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
+from thoughtful_backend.chatbots.wrapper import ChatBotApiError, ChatBotWrapper
 from thoughtful_backend.utils.input_validator import SuspiciousInputError
 
 _LOGGER = logging.getLogger(__name__)
@@ -40,13 +40,11 @@ class PrimmFeedbackApiHandler:
     def __init__(
         self,
         throttle_table: ThrottleTable,
-        secrets_table: SecretsTable,
         chatbot_wrapper: ChatBotWrapper,
         primm_submissions_table: PrimmSubmissionsTable,
         metrics_manager: MetricsManager,
     ):
         self.throttle_table = throttle_table
-        self.secrets_table = secrets_table
         self.chatbot_wrapper = chatbot_wrapper
         self.primm_submissions_table = primm_submissions_table
         self.metrics_manager = metrics_manager
@@ -77,7 +75,6 @@ class PrimmFeedbackApiHandler:
             _LOGGER.info(f"Throttling check passed for user {user_id}. Calling ChatBot.")
 
             ai_eval_response: PrimmEvaluationResponseModel = self.chatbot_wrapper.call_primm_evaluation_api(
-                chatbot_api_key=self.secrets_table.get_chatbot_api_key(),
                 code_snippet=request_data.codeSnippet,
                 prediction_prompt_text=request_data.userPredictionPromptText,
                 user_prediction_text=request_data.userPredictionText,
@@ -141,12 +138,11 @@ def primm_feedback_lambda_handler(event: dict, context: typing.Any) -> dict:
         throttle_table = ThrottleTable(get_throttle_table_name())
         primm_submissions_table = PrimmSubmissionsTable(get_primm_submissions_table_name())
         secrets_table = SecretsTable(get_secrets_table_name())
-        chatbot_wrapper = ChatBotWrapper()
+        chatbot_wrapper = ChatBotWrapper(provider="claude", api_key=secrets_table.get_claude_api_key())
 
         api_handler = PrimmFeedbackApiHandler(
             throttle_table=throttle_table,
             primm_submissions_table=primm_submissions_table,
-            secrets_table=secrets_table,
             chatbot_wrapper=chatbot_wrapper,
             metrics_manager=metrics_manager,
         )

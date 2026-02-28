@@ -3,20 +3,20 @@ from unittest.mock import Mock, patch
 
 import pytest
 
-from thoughtful_backend.utils.chatbot_utils import ChatBotApiError, ChatBotWrapper
+from thoughtful_backend.chatbots.wrapper import ChatBotApiError, ChatBotWrapper
 from thoughtful_backend.utils.input_validator import SuspiciousInputError
 
 
 def test_chatbot_wrapper_init() -> None:
-    ChatBotWrapper()
+    ChatBotWrapper(provider="claude", api_key="test-key")
+    ChatBotWrapper(provider="gemini", api_key="test-key")
 
 
-def test_chatbot_wrapper_gen_reflection_feedback_prompt_1() -> None:
+def test_chatbot_wrapper_gen_reflection_feedback_prompt_student_code() -> None:
     """
     Test prompt where student writes their own code
     """
-
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
     prompt = cbw.generate_reflection_feedback_prompt(
         topic="For Loops",
         is_topic_predefined=False,
@@ -30,12 +30,11 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_1() -> None:
     assert "**Student's Explanation:**\n\nAround\n" in prompt
 
 
-def test_chatbot_wrapper_gen_reflection_feedback_prompt_2() -> None:
+def test_chatbot_wrapper_gen_reflection_feedback_prompt_predefined_code() -> None:
     """
     Test prompt where student is given predefined code they have to explain
     """
-
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
     prompt = cbw.generate_reflection_feedback_prompt(
         topic="For Loops",
         is_topic_predefined=False,
@@ -50,33 +49,21 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_2() -> None:
     assert "**Student's Explanation:**\n\n```\nAround\n```" in prompt
 
 
-@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
-def test_call_reflection_feedback_api_normal_behavior(mock_post):
-    mock_response = Mock()
-    mock_response.status_code = 200
+@patch("thoughtful_backend.chatbots.claude.anthropic.Anthropic")
+def test_call_reflection_feedback_api_claude(mock_anthropic_class):
+    mock_client = Mock()
+    mock_anthropic_class.return_value = mock_client
 
-    expected_api_response_data = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [
-                        {
-                            "text": '{"aiAssessment": "achieves", "aiFeedback": "Your code is clear and the explanation is thorough."}'
-                        }
-                    ],
-                    "role": "model",
-                },
-            }
-        ],
-    }
-    mock_response.json.return_value = expected_api_response_data
-    mock_post.return_value = mock_response
+    mock_message = Mock()
+    mock_content_block = Mock()
+    mock_content_block.type = "text"
+    mock_content_block.text = '{"aiAssessment": "achieves", "aiFeedback": "Your code is clear."}'
+    mock_message.content = [mock_content_block]
+    mock_client.messages.create.return_value = mock_message
 
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
 
-    # Expected prompt that will be generated
     feedback = cbw.call_reflection_api(
-        chatbot_api_key="key",
         topic="For loops",
         is_topic_predefined=False,
         code="for i in range(i):",
@@ -85,32 +72,31 @@ def test_call_reflection_feedback_api_normal_behavior(mock_post):
     )
 
     assert feedback.aiAssessment == "achieves"
-    assert feedback.aiFeedback == "Your code is clear and the explanation is thorough."
+    assert feedback.aiFeedback == "Your code is clear."
+    mock_client.messages.create.assert_called_once()
 
-    mock_post.assert_called_once()
 
-
-@pytest.mark.xfail(raises=ChatBotApiError)
-@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
-def test_call_reflection_feedback_api_abnormal_behavior(mock_post):
+@patch("thoughtful_backend.chatbots.gemini.requests.post")
+def test_call_reflection_feedback_api_gemini(mock_post):
     mock_response = Mock()
     mock_response.status_code = 200
 
     expected_api_response_data = {
         "candidates": [
             {
-                "content": {"parts": []},
+                "content": {
+                    "parts": [{"text": '{"aiAssessment": "achieves", "aiFeedback": "Your code is clear."}'}],
+                    "role": "model",
+                },
             }
         ],
     }
     mock_response.json.return_value = expected_api_response_data
     mock_post.return_value = mock_response
 
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="gemini", api_key="test-key")
 
-    # Expected prompt that will be generated
-    cbw.call_reflection_api(
-        chatbot_api_key="key",
+    feedback = cbw.call_reflection_api(
         topic="For loops",
         is_topic_predefined=False,
         code="for i in range(i):",
@@ -118,12 +104,37 @@ def test_call_reflection_feedback_api_abnormal_behavior(mock_post):
         explanation="Around",
     )
 
+    assert feedback.aiAssessment == "achieves"
+    assert feedback.aiFeedback == "Your code is clear."
+    mock_post.assert_called_once()
+
+
+@patch("thoughtful_backend.chatbots.claude.anthropic.Anthropic")
+def test_call_reflection_api_empty_response_raises_error(mock_anthropic_class):
+    mock_client = Mock()
+    mock_anthropic_class.return_value = mock_client
+
+    mock_message = Mock()
+    mock_message.content = []
+    mock_client.messages.create.return_value = mock_message
+
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    with pytest.raises(ChatBotApiError):
+        cbw.call_reflection_api(
+            topic="For loops",
+            is_topic_predefined=False,
+            code="for i in range(i):",
+            is_code_predefined=False,
+            explanation="Around",
+        )
+
 
 def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_predefined() -> None:
     """
     Test prompt with extra context where student is given predefined code
     """
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
     prompt = cbw.generate_reflection_feedback_prompt(
         topic="For Loops",
         is_topic_predefined=False,
@@ -145,7 +156,7 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_stude
     """
     Test prompt with extra context where student writes their own code
     """
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
     prompt = cbw.generate_reflection_feedback_prompt(
         topic="While Loops",
         is_topic_predefined=False,
@@ -164,9 +175,9 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_stude
 
 def test_chatbot_wrapper_gen_reflection_feedback_prompt_without_extra_context() -> None:
     """
-    Test that prompts work correctly when extra_context is not provided (backward compatibility)
+    Test that prompts work correctly when extra_context is not provided
     """
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
     prompt = cbw.generate_reflection_feedback_prompt(
         topic="For Loops",
         is_topic_predefined=False,
@@ -178,12 +189,11 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_without_extra_context() 
     assert "**Student's Chosen Topic:** For Loops" in prompt
     assert "```python\nfor i in range\n```" in prompt
     assert "**Student's Explanation:**\n\nAround\n" in prompt
-    # Extra context section should be present but empty
     assert "**Context of Where the Student Is/What They Know:**" in prompt
 
 
 def test_chatbot_wrapper_gen_primm_feedback_prompt() -> None:
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
     prompt = cbw.generate_primm_feedback_prompt(
         code_snippet="for i in range(4)",
         prediction_prompt_text="What's it do?",
@@ -195,8 +205,177 @@ def test_chatbot_wrapper_gen_primm_feedback_prompt() -> None:
     assert "```python\nfor i in range(4)\n```" in prompt
 
 
-@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
-def test_call_primm_feedback_api_normal_behavior(mock_post):
+@patch("thoughtful_backend.chatbots.claude.anthropic.Anthropic")
+def test_call_primm_feedback_api_claude(mock_anthropic_class):
+    mock_client = Mock()
+    mock_anthropic_class.return_value = mock_client
+
+    mock_message = Mock()
+    mock_content_block = Mock()
+    mock_content_block.type = "text"
+    mock_content_block.text = '{"aiPredictionAssessment": "mostly", "aiExplanationAssessment": "developing", "aiOverallComment": "I need more"}'
+    mock_message.content = [mock_content_block]
+    mock_client.messages.create.return_value = mock_message
+
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    feedback = cbw.call_primm_evaluation_api(
+        code_snippet="for i in range(4):",
+        prediction_prompt_text="What's it do?",
+        user_prediction_text="it loops",
+        user_explanation_text="I was right",
+        actual_output_summary="it went around",
+    )
+
+    assert feedback.aiPredictionAssessment == "mostly"
+    assert feedback.aiExplanationAssessment == "developing"
+    assert feedback.aiOverallComment == "I need more"
+
+    mock_client.messages.create.assert_called_once()
+
+
+@patch("thoughtful_backend.chatbots.claude.anthropic.Anthropic")
+def test_output_validation_blocks_excessive_feedback(mock_anthropic_class):
+    """
+    Test that output validation blocks AI responses exceeding MAX_FEEDBACK_LENGTH.
+    """
+    mock_client = Mock()
+    mock_anthropic_class.return_value = mock_client
+
+    excessive_feedback = "This is feedback. " * 50  # ~900 chars
+
+    mock_message = Mock()
+    mock_content_block = Mock()
+    mock_content_block.type = "text"
+    mock_content_block.text = f'{{"aiFeedback": "{excessive_feedback}", "aiAssessment": "mostly"}}'
+    mock_message.content = [mock_content_block]
+    mock_client.messages.create.return_value = mock_message
+
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    with pytest.raises(ChatBotApiError, match="exceeds maximum length"):
+        cbw.call_reflection_api(
+            topic="Loops",
+            is_topic_predefined=False,
+            code="for i in range(10): print(i)",
+            is_code_predefined=False,
+            explanation="This loops and prints numbers",
+        )
+
+
+@patch("thoughtful_backend.chatbots.claude.anthropic.Anthropic")
+def test_output_validation_allows_normal_feedback(mock_anthropic_class):
+    """
+    Test that output validation allows normal-length feedback.
+    """
+    mock_client = Mock()
+    mock_anthropic_class.return_value = mock_client
+
+    normal_feedback = "Good work! Your explanation is clear and demonstrates understanding of the concept."
+
+    mock_message = Mock()
+    mock_content_block = Mock()
+    mock_content_block.type = "text"
+    mock_content_block.text = f'{{"aiFeedback": "{normal_feedback}", "aiAssessment": "achieves"}}'
+    mock_message.content = [mock_content_block]
+    mock_client.messages.create.return_value = mock_message
+
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    result = cbw.call_reflection_api(
+        topic="Loops",
+        is_topic_predefined=False,
+        code="for i in range(10): print(i)",
+        is_code_predefined=False,
+        explanation="This loops and prints numbers",
+    )
+
+    assert result.aiFeedback == normal_feedback
+    assert result.aiAssessment == "achieves"
+
+
+def test_call_reflection_api_validates_input_excessive_length():
+    """
+    Test that call_reflection_api validates input and rejects overly long explanations.
+    """
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    with pytest.raises(SuspiciousInputError, match="exceeds maximum length"):
+        cbw.call_reflection_api(
+            topic="Loops",
+            is_topic_predefined=False,
+            code="for i in range(10): print(i)",
+            is_code_predefined=False,
+            explanation="A" * 3000,  # Exceeds 2000 char limit
+        )
+
+
+def test_call_reflection_api_validates_input_excessive_headers():
+    """
+    Test that call_reflection_api validates input and rejects too many markdown headers.
+    """
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    with pytest.raises(SuspiciousInputError, match="too many section headers"):
+        cbw.call_reflection_api(
+            topic="Loops",
+            is_topic_predefined=False,
+            code="for i in range(10): print(i)",
+            is_code_predefined=False,
+            explanation="### 1\n### 2\n### 3\n### 4\n### 5",  # Too many headers
+        )
+
+
+def test_call_reflection_api_validates_input_special_chars():
+    """
+    Test that call_reflection_api validates input and rejects excessive consecutive special characters.
+    """
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    with pytest.raises(SuspiciousInputError, match="unusual character sequences"):
+        cbw.call_reflection_api(
+            topic="Loops",
+            is_topic_predefined=False,
+            code="for i in range(10): print(i)",
+            is_code_predefined=False,
+            explanation="This is @@@@@@@@@@@@@ suspicious",  # Too many consecutive special chars
+        )
+
+
+def test_call_primm_evaluation_api_validates_input_excessive_length():
+    """
+    Test that call_primm_evaluation_api validates input and rejects overly long predictions.
+    """
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    with pytest.raises(SuspiciousInputError, match="exceeds maximum length"):
+        cbw.call_primm_evaluation_api(
+            code_snippet="print('hello')",
+            prediction_prompt_text="What will this print?",
+            user_prediction_text="A" * 1500,  # Exceeds 1000 char limit for predictions
+            user_explanation_text="It prints hello",
+            actual_output_summary="hello",
+        )
+
+
+def test_call_primm_evaluation_api_validates_input_excessive_headers():
+    """
+    Test that call_primm_evaluation_api validates input and rejects too many headers in explanation.
+    """
+    cbw = ChatBotWrapper(provider="claude", api_key="test-key")
+
+    with pytest.raises(SuspiciousInputError, match="too many section headers"):
+        cbw.call_primm_evaluation_api(
+            code_snippet="print('hello')",
+            prediction_prompt_text="What will this print?",
+            user_prediction_text="It will print hello",
+            user_explanation_text="### 1\n### 2\n### 3\n### 4\n### 5",  # Too many headers
+            actual_output_summary="hello",
+        )
+
+
+@patch("thoughtful_backend.chatbots.gemini.requests.post")
+def test_call_primm_feedback_api_gemini(mock_post):
     mock_response = Mock()
     mock_response.status_code = 200
 
@@ -217,11 +396,9 @@ def test_call_primm_feedback_api_normal_behavior(mock_post):
     mock_response.json.return_value = expected_api_response_data
     mock_post.return_value = mock_response
 
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="gemini", api_key="test-key")
 
-    # Expected prompt that will be generated
     feedback = cbw.call_primm_evaluation_api(
-        chatbot_api_key="key",
         code_snippet="for i in range(4):",
         prediction_prompt_text="What's it do?",
         user_prediction_text="it loops",
@@ -236,11 +413,40 @@ def test_call_primm_feedback_api_normal_behavior(mock_post):
     mock_post.assert_called_once()
 
 
-@pytest.mark.xfail(raises=ChatBotApiError)
-@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
-def test_call_primm_feedback_api_abnormal_behavior(mock_post):
+@patch("thoughtful_backend.chatbots.gemini.requests.post")
+def test_call_reflection_feedback_api_gemini_empty_parts_raises_error(mock_post):
     """
-    Test that if feedback is missing, we generate a ChatBot error
+    Test that if Gemini returns empty parts, we generate a ChatBot error
+    """
+    mock_response = Mock()
+    mock_response.status_code = 200
+
+    expected_api_response_data = {
+        "candidates": [
+            {
+                "content": {"parts": []},
+            }
+        ],
+    }
+    mock_response.json.return_value = expected_api_response_data
+    mock_post.return_value = mock_response
+
+    cbw = ChatBotWrapper(provider="gemini", api_key="test-key")
+
+    with pytest.raises(ChatBotApiError):
+        cbw.call_reflection_api(
+            topic="For loops",
+            is_topic_predefined=False,
+            code="for i in range(i):",
+            is_code_predefined=False,
+            explanation="Around",
+        )
+
+
+@patch("thoughtful_backend.chatbots.gemini.requests.post")
+def test_call_primm_feedback_api_gemini_empty_parts_raises_error(mock_post):
+    """
+    Test that if Gemini returns empty parts for PRIMM, we generate a ChatBot error
     """
     mock_response = Mock()
     mock_response.status_code = 200
@@ -258,175 +464,13 @@ def test_call_primm_feedback_api_abnormal_behavior(mock_post):
     mock_response.json.return_value = expected_api_response_data
     mock_post.return_value = mock_response
 
-    cbw = ChatBotWrapper()
+    cbw = ChatBotWrapper(provider="gemini", api_key="test-key")
 
-    # Expected prompt that will be generated
-    cbw.call_primm_evaluation_api(
-        chatbot_api_key="key",
-        code_snippet="for i in range(4):",
-        prediction_prompt_text="What's it do?",
-        user_prediction_text="it loops",
-        user_explanation_text="I was right",
-        actual_output_summary="it went around",
-    )
-
-
-@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
-def test_output_validation_blocks_excessive_feedback(mock_post):
-    """
-    Test that output validation blocks AI responses exceeding MAX_FEEDBACK_LENGTH.
-    """
-    mock_response = Mock()
-    mock_response.status_code = 200
-
-    # Create feedback that exceeds the 500 char limit
-    excessive_feedback = "This is feedback. " * 50  # ~900 chars
-
-    expected_api_response_data = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [{"text": f'{{"aiFeedback": "{excessive_feedback}", "aiAssessment": "mostly"}}'}],
-                    "role": "model",
-                },
-            }
-        ],
-    }
-    mock_response.json.return_value = expected_api_response_data
-    mock_post.return_value = mock_response
-
-    cbw = ChatBotWrapper()
-
-    with pytest.raises(ChatBotApiError, match="exceeds maximum length"):
-        cbw.call_reflection_api(
-            chatbot_api_key="key",
-            topic="Loops",
-            is_topic_predefined=False,
-            code="for i in range(10): print(i)",
-            is_code_predefined=False,
-            explanation="This loops and prints numbers",
-        )
-
-
-@patch("thoughtful_backend.utils.chatbot_utils.requests.post")
-def test_output_validation_allows_normal_feedback(mock_post):
-    """
-    Test that output validation allows normal-length feedback.
-    """
-    mock_response = Mock()
-    mock_response.status_code = 200
-
-    normal_feedback = "Good work! Your explanation is clear and demonstrates understanding of the concept."
-
-    expected_api_response_data = {
-        "candidates": [
-            {
-                "content": {
-                    "parts": [{"text": f'{{"aiFeedback": "{normal_feedback}", "aiAssessment": "achieves"}}'}],
-                    "role": "model",
-                },
-            }
-        ],
-    }
-    mock_response.json.return_value = expected_api_response_data
-    mock_post.return_value = mock_response
-
-    cbw = ChatBotWrapper()
-
-    # Should not raise
-    result = cbw.call_reflection_api(
-        chatbot_api_key="key",
-        topic="Loops",
-        is_topic_predefined=False,
-        code="for i in range(10): print(i)",
-        is_code_predefined=False,
-        explanation="This loops and prints numbers",
-    )
-
-    assert result.aiFeedback == normal_feedback
-    assert result.aiAssessment == "achieves"
-
-
-def test_call_reflection_api_validates_input_excessive_length():
-    """
-    Test that call_reflection_api validates input and rejects overly long explanations.
-    """
-    cbw = ChatBotWrapper()
-
-    with pytest.raises(SuspiciousInputError, match="exceeds maximum length"):
-        cbw.call_reflection_api(
-            chatbot_api_key="key",
-            topic="Loops",
-            is_topic_predefined=False,
-            code="for i in range(10): print(i)",
-            is_code_predefined=False,
-            explanation="A" * 3000,  # Exceeds 2000 char limit
-        )
-
-
-def test_call_reflection_api_validates_input_excessive_headers():
-    """
-    Test that call_reflection_api validates input and rejects too many markdown headers.
-    """
-    cbw = ChatBotWrapper()
-
-    with pytest.raises(SuspiciousInputError, match="too many section headers"):
-        cbw.call_reflection_api(
-            chatbot_api_key="key",
-            topic="Loops",
-            is_topic_predefined=False,
-            code="for i in range(10): print(i)",
-            is_code_predefined=False,
-            explanation="### 1\n### 2\n### 3\n### 4\n### 5",  # Too many headers
-        )
-
-
-def test_call_reflection_api_validates_input_special_chars():
-    """
-    Test that call_reflection_api validates input and rejects excessive consecutive special characters.
-    """
-    cbw = ChatBotWrapper()
-
-    with pytest.raises(SuspiciousInputError, match="unusual character sequences"):
-        cbw.call_reflection_api(
-            chatbot_api_key="key",
-            topic="Loops",
-            is_topic_predefined=False,
-            code="for i in range(10): print(i)",
-            is_code_predefined=False,
-            explanation="This is @@@@@@@@@@@@@ suspicious",  # Too many consecutive special chars
-        )
-
-
-def test_call_primm_evaluation_api_validates_input_excessive_length():
-    """
-    Test that call_primm_evaluation_api validates input and rejects overly long predictions.
-    """
-    cbw = ChatBotWrapper()
-
-    with pytest.raises(SuspiciousInputError, match="exceeds maximum length"):
+    with pytest.raises(ChatBotApiError):
         cbw.call_primm_evaluation_api(
-            chatbot_api_key="key",
-            code_snippet="print('hello')",
-            prediction_prompt_text="What will this print?",
-            user_prediction_text="A" * 1500,  # Exceeds 1000 char limit for predictions
-            user_explanation_text="It prints hello",
-            actual_output_summary="hello",
-        )
-
-
-def test_call_primm_evaluation_api_validates_input_excessive_headers():
-    """
-    Test that call_primm_evaluation_api validates input and rejects too many headers in explanation.
-    """
-    cbw = ChatBotWrapper()
-
-    with pytest.raises(SuspiciousInputError, match="too many section headers"):
-        cbw.call_primm_evaluation_api(
-            chatbot_api_key="key",
-            code_snippet="print('hello')",
-            prediction_prompt_text="What will this print?",
-            user_prediction_text="It will print hello",
-            user_explanation_text="### 1\n### 2\n### 3\n### 4\n### 5",  # Too many headers
-            actual_output_summary="hello",
+            code_snippet="for i in range(4):",
+            prediction_prompt_text="What's it do?",
+            user_prediction_text="it loops",
+            user_explanation_text="I was right",
+            actual_output_summary="it went around",
         )

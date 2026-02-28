@@ -11,8 +11,11 @@ pydantic==2.12.3
 # Authentication
 PyJWT==2.10.1
 
-# HTTP requests (for Google OAuth verification and AI API calls)
+# HTTP requests (for Google OAuth verification)
 requests==2.32.5
+
+# Anthropic Claude API
+anthropic>=0.40.0
 
 # Testing dependencies
 pytest==8.4.2

@@ -48,20 +48,34 @@ def test_get_jwt_secret_key_exists(secrets_table: SecretsTable):
     assert secret_value == "test-jwt-secret-value-123"
 
 
-def test_get_chatbot_api_key_exists(secrets_table: SecretsTable):
-    """Test retrieving an existing ChatBot API key."""
-    # Manually insert ChatBot API key into the mock table
+def test_get_gemini_api_key_exists(secrets_table: SecretsTable):
+    """Test retrieving an existing Gemini API key."""
     secrets_table.table.put_item(
         Item={
-            "secretKey": "CHATBOT_API_KEY",
-            "secretValue": "test-chatbot-api-key-456",
-            "description": "ChatBot API key",
+            "secretKey": "GEMINI_API_KEY",
+            "secretValue": "test-gemini-api-key-456",
+            "description": "Gemini API key",
             "updatedAt": "2025-01-01T00:00:00Z",
         }
     )
 
-    secret_value = secrets_table.get_chatbot_api_key()
-    assert secret_value == "test-chatbot-api-key-456"
+    secret_value = secrets_table.get_gemini_api_key()
+    assert secret_value == "test-gemini-api-key-456"
+
+
+def test_get_claude_api_key_exists(secrets_table: SecretsTable):
+    """Test retrieving an existing Claude API key."""
+    secrets_table.table.put_item(
+        Item={
+            "secretKey": "CLAUDE_API_KEY",
+            "secretValue": "test-claude-api-key-789",
+            "description": "Claude API key",
+            "updatedAt": "2025-01-01T00:00:00Z",
+        }
+    )
+
+    secret_value = secrets_table.get_claude_api_key()
+    assert secret_value == "test-claude-api-key-789"
 
 
 def test_get_jwt_secret_key_not_found(secrets_table: SecretsTable):
@@ -71,11 +85,18 @@ def test_get_jwt_secret_key_not_found(secrets_table: SecretsTable):
     assert "JWT_SECRET" in str(exc_info.value)
 
 
-def test_get_chatbot_api_key_not_found(secrets_table: SecretsTable):
-    """Test that KeyError is raised when ChatBot API key is not found."""
+def test_get_gemini_api_key_not_found(secrets_table: SecretsTable):
+    """Test that KeyError is raised when Gemini API key is not found."""
     with pytest.raises(KeyError) as exc_info:
-        secrets_table.get_chatbot_api_key()
-    assert "CHATBOT_API_KEY" in str(exc_info.value)
+        secrets_table.get_gemini_api_key()
+    assert "GEMINI_API_KEY" in str(exc_info.value)
+
+
+def test_get_claude_api_key_not_found(secrets_table: SecretsTable):
+    """Test that KeyError is raised when Claude API key is not found."""
+    with pytest.raises(KeyError) as exc_info:
+        secrets_table.get_claude_api_key()
+    assert "CLAUDE_API_KEY" in str(exc_info.value)
 
 
 def test_secret_caching(secrets_table: SecretsTable):

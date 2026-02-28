@@ -3,8 +3,7 @@ import json
 from unittest.mock import MagicMock, Mock
 
 from thoughtful_backend.lambdas.learning_entries_lambda import LearningEntriesApiHandler
-from thoughtful_backend.models.learning_entry_models import ReflectionVersionItemModel
-from thoughtful_backend.utils.chatbot_utils import ChatBotFeedback
+from thoughtful_backend.models.learning_entry_models import ChatBotFeedback, ReflectionVersionItemModel
 
 from ..test_utils.authorizer import add_authorizer_info
 
@@ -12,20 +11,17 @@ from ..test_utils.authorizer import add_authorizer_info
 def create_learning_entries_api_handler(
     learning_entries_table=Mock(),
     throttle_table=Mock(),
-    secrets_table=Mock(),
     chatbot_wrapper=Mock(),
     metrics_manager=Mock(),
 ) -> LearningEntriesApiHandler:
     authorizer_handler = LearningEntriesApiHandler(
         learning_entries_table,
         throttle_table,
-        secrets_table,
         chatbot_wrapper,
         metrics_manager=metrics_manager,
     )
     assert authorizer_handler.learning_entries_table == learning_entries_table
     assert authorizer_handler.throttle_table == throttle_table
-    assert authorizer_handler.secrets_table == secrets_table
     assert authorizer_handler.chatbot_wrapper == chatbot_wrapper
     assert authorizer_handler.metrics_manager == metrics_manager
 
