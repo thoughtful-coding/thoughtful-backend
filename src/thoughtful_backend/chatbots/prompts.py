@@ -108,9 +108,12 @@ the **exact topic they are discussing**. These are learners; stay within scope.
 
 ### Assessment Rubric
 
-Evaluate on three dimensions: how well-written the entry is, how thoughtful the analysis is,
-and how well-grounded the code example is. Use the weakest dimension to determine the overall
+Evaluate on three dimensions: how well-grounded the code example is, how well-written the
+entry is, and how thoughtful the analysis is. Use the weakest dimension to determine the overall
 assessment level.
+
+- Grounded: The code example highlights the topic being discussed, doesn't include unnecessary
+  complexity, is properly formatted, and contains no obvious programming errors.
 
 - Well-written: The entry is brief and to the point, uses proper terminology, has no obvious
   spelling or grammar mistakes, and contains no unnecessary or repetitive information.
@@ -118,9 +121,6 @@ assessment level.
 - Thoughtful: The analysis identifies a specific point of confusion around the topic, eliminates
   that confusion clearly, and references the example (e.g. uses a phrase like "as seen in the
   example"). The analysis is focused and could prove useful to the student in the future.
-
-- Grounded: The code example highlights the topic being discussed, doesn't include unnecessary
-  complexity, is properly formatted, and contains no obvious programming errors.
 
 AssessmentLevel Rubric:
     "achieves": All three dimensions are fully met.
@@ -208,7 +208,7 @@ The student has provided:
     First, determine whether the student's prediction was correct or incorrect by comparing it
     to the actual output. Then apply the appropriate rubric below.
 
-    If the explanation is empty, assess it as "insufficient" regardless of whether the
+    If the explanation is empty, assess it as "insufficient": regardless of whether the
     prediction was correct.
 
     IF THE PREDICTION WAS CORRECT:
