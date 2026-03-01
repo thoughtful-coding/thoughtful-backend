@@ -237,11 +237,11 @@ if __name__ == "__main__":
     print(f"Testing {provider}...")
     wrapper = ChatBotWrapper(provider=provider, api_key=api_key)
     result = wrapper.call_reflection_api(
-        topic="For loops",
-        is_topic_predefined=False,
-        code="for i in range(3):\n    print(i)",
+        topic="How Print Works",
+        is_topic_predefined=True,
+        code="""print("Hello, World!")\nprint("Am I a programmer now?")""",
         is_code_predefined=False,
-        explanation="This loops 3 times and prints 0, 1, 2.",
+        explanation="""Print works by printing out everything inside the quotation marks. As seen in the example above, the program first prints out "hello world!". Then, on the next line, it prints out a question. Print is useful for telling users what a program is doing and giving them useful results.""",
     )
     print(f"aiFeedback: {result.aiFeedback}")
     print(f"aiAssessment: {result.aiAssessment}")

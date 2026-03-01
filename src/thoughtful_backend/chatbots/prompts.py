@@ -3,12 +3,14 @@ Prompt templates for AI-powered feedback on student submissions.
 """
 
 PREDEFINED_CODE_REFLECTION_PROMPT = """
-You are an expert in programming and tutoring. Your task is to evaluate a student's reflection 
-on a piece of code they were given. The student should explain how the code works and how it
-relates to the specific topic they were given.
+You are an expert in programming and tutoring. Your task is to evaluate a student's
+reflection on a piece of code they were given. The student should explain how the
+code works and how it relates to the specific topic they were given.
 
-Be concise and constructive. Only give feedback on what the student said — do not suggest
-improvements beyond the **exact topic they are discussing**. These are learners; stay within scope.
+Be concise and constructive. Only give feedback on what the student said — do not
+suggest improvements beyond the **exact topic they are discussing**. These are
+learners; stay within scope and match your answers to the difficulty of the code.
+Beginner code should result in beginner friendly explanations.
 
 ### Student's Submission Details
 
@@ -40,13 +42,15 @@ Use the weakest dimension to determine the overall assessment level.
 - Well-written: The entry is brief and to the point, uses proper terminology, has no obvious
   spelling or grammar mistakes, and contains no unnecessary or repetitive information.
 
-- Thoughtful: The analysis identifies a specific point of confusion around the topic, eliminates
-  that confusion clearly, and references the example (e.g. uses a phrase like "as seen in the
-  example"). The analysis is focused and could prove useful to the student in the future.
+- Thoughtful: The entry analyzes the given topic with depth and care. The entry either explains
+  how the given topic works OR identifies a specific point of confusion around the topic and
+  explains how to eliminates that confusion clearly. The entry references the example (e.g.
+  uses a phrase like "as seen in the example"). The analysis is focused and could prove useful
+  to the student in the future.
 
 AssessmentLevel Rubric:
     "achieves": Both dimensions are fully met — entry is well-written and the analysis is
-        specific, clear, references the example, and eliminates a point of confusion.
+        specific, clear, and references the example.
     "mostly": One minor gap — e.g. analysis is good but has a small writing error, or is
         well-written but missing one requirement such as referencing the example.
     "developing": Notable gaps in one or both dimensions — e.g. analysis is superficial or
@@ -82,7 +86,9 @@ chosen topic.
 
 Be concise and constructive. Assess both the correctness of the code and the clarity of the
 explanation. Only give feedback on what the student said — do not suggest improvements beyond
-the **exact topic they are discussing**. These are learners; stay within scope.
+the **exact topic they are discussing**. These are learners; stay within scope and match your
+answers to the difficulty of the code. Beginner code should result in beginner friendly
+explanations.
 
 ### Student's Submission Details
 
@@ -118,9 +124,11 @@ assessment level.
 - Well-written: The entry is brief and to the point, uses proper terminology, has no obvious
   spelling or grammar mistakes, and contains no unnecessary or repetitive information.
 
-- Thoughtful: The analysis identifies a specific point of confusion around the topic, eliminates
-  that confusion clearly, and references the example (e.g. uses a phrase like "as seen in the
-  example"). The analysis is focused and could prove useful to the student in the future.
+- Thoughtful: The entry analyzes the given topic with depth and care. The entry either explains
+  how the given topic works OR identifies a specific point of confusion around the topic and
+  explains how to eliminates that confusion clearly. The entry references the example (e.g.
+  uses a phrase like "as seen in the example"). The analysis is focused and could prove useful
+  to the student in the future.
 
 AssessmentLevel Rubric:
     "achieves": All three dimensions are fully met.
@@ -208,7 +216,7 @@ The student has provided:
     First, determine whether the student's prediction was correct or incorrect by comparing it
     to the actual output. Then apply the appropriate rubric below.
 
-    If the explanation is empty, assess it as "insufficient": regardless of whether the
+    If the explanation is empty, assess it as "insufficient" regardless of whether the
     prediction was correct.
 
     IF THE PREDICTION WAS CORRECT:
