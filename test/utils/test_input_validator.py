@@ -151,20 +151,20 @@ class TestInputValidatorConsecutiveSpecialChars:
     def test_python_traceback_with_caret_underlines_allowed_in_output_summary(self):
         """Python tracebacks with long ^^^ underlines should pass for output_summary"""
         traceback = (
-            'SyntaxError: Traceback (most recent call last):\n'
+            "SyntaxError: Traceback (most recent call last):\n"
             '  File "/lib/python311.zip/_pyodide/_base.py", line 573, in eval_code_async\n'
-            '    await CodeRunner(\n'
-            '          ^^^^^^^^^^^\n'
+            "    await CodeRunner(\n"
+            "          ^^^^^^^^^^^\n"
             '  File "/lib/python311.zip/_pyodide/_base.py", line 267, in __init__\n'
-            '    self.ast = next(self._gen)\n'
-            '               ^^^^^^^^^^^^^^^\n'
+            "    self.ast = next(self._gen)\n"
+            "               ^^^^^^^^^^^^^^^\n"
             '  File "/lib/python311.zip/_pyodide/_base.py", line 145, in _parse_and_compile_gen\n'
-            '    mod = compile(source, filename, mode, flags | ast.PyCF_ONLY_AST)\n'
-            '          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n'
+            "    mod = compile(source, filename, mode, flags | ast.PyCF_ONLY_AST)\n"
+            "          ^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^^\n"
             '  File "<exec>", line 1\n'
             '    print("John Dewey said: "We learn from reflecting on experience.")\n'
-            '                                                                    ^\n'
-            'SyntaxError: unterminated string literal (detected at line 1)\n'
+            "                                                                    ^\n"
+            "SyntaxError: unterminated string literal (detected at line 1)\n"
         )
         InputValidator.validate_field(traceback, "output_summary")
 
