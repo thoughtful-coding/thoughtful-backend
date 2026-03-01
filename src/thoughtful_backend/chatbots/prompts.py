@@ -3,16 +3,12 @@ Prompt templates for AI-powered feedback on student submissions.
 """
 
 PREDEFINED_CODE_REFLECTION_PROMPT = """
-You are an expert in programming and tutoring. Your task is to evaluate a student's
-explanation of a piece of code they were given. Their explanation should explain
-how the code works and how it pertains to the specific topic they were also given.
+You are an expert in programming and tutoring. Your task is to evaluate a student's reflection 
+on a piece of code they were given. The student should explain how the code works and how it
+relates to the specific topic they were given.
 
-Provide short, concise, and constructive feedback and an assessment level on their
-analysis of the given piece of code. Be mindful that these are students, so your
-feedback should not go beyond the scope of the topic they are trying to explain.
-Put another way, these students are learning, so ONLY give them feedback on what
-they said. Do not make suggestions that are beyond the exact topic they are
-discussing.
+Be concise and constructive. Only give feedback on what the student said — do not suggest
+improvements beyond the **exact topic they are discussing**. These are learners; stay within scope.
 
 ### Student's Submission Details
 
@@ -36,22 +32,38 @@ discussing.
 {explanation}
 ```
 
-### Rubric for Assessment Levels
+### Assessment Rubric
 
-| Objective | Requirements/Specifications | Achieves | Mostly | Developing | Insufficient |
-| :---- | :---- | :---- | :---- | :---- | :---- |
-| Well-written: Entry is well-written and displays level of care expected in other, writing-centered classes | Entry is brief and to the point: it is no longer than it has to be. Entry uses proper terminology. Entry has no obvious spelling mistakes Entry uses proper grammar  | Entry is of high quality without any obvious errors or extraneous information | Entry contains one or two errors and could only be shortened a little | Entry contains many errors and has a lot of unnecessary, repetitive information. |  |
-| Thoughtful: Entry includes analysis that is easy to understand and could prove useful in the future | Analysis is about a topic that could conceivably come up in a future CS class. Analysis identifies single possible point of confusion. Analysis eliminates all possible confusion on the topic. Analysis references example. The phrase "as seen in the example" present in entry. | All requirements met. | Entry contains all but one of the requirements. | Entry's analysis is superficial an unfocused. |  |
+Evaluate on two dimensions: how well-written the entry is, and how thoughtful the analysis is.
+Use the weakest dimension to determine the overall assessment level.
+
+- Well-written: The entry is brief and to the point, uses proper terminology, has no obvious
+  spelling or grammar mistakes, and contains no unnecessary or repetitive information.
+
+- Thoughtful: The analysis identifies a specific point of confusion around the topic, eliminates
+  that confusion clearly, and references the example (e.g. uses a phrase like "as seen in the
+  example"). The analysis is focused and could prove useful to the student in the future.
+
+AssessmentLevel Rubric:
+    "achieves": Both dimensions are fully met — entry is well-written and the analysis is
+        specific, clear, references the example, and eliminates a point of confusion.
+    "mostly": One minor gap — e.g. analysis is good but has a small writing error, or is
+        well-written but missing one requirement such as referencing the example.
+    "developing": Notable gaps in one or both dimensions — e.g. analysis is superficial or
+        unfocused, or writing has many errors and unnecessary content.
+    "insufficient": Does not demonstrate a genuine attempt to explain the code or address
+        the topic.
 
 ### Instructions
 
-Please provide your evaluation in a strict JSON format with the following structure and keys (use camelCase for keys).
-For example:
+Be concise. Keep aiFeedback to 2-3 sentences maximum.
+
+Please provide your evaluation in a strict JSON format with the following structure and keys (use camelCase for keys):
 
 ```
 {{
-    "aiFeedback": "Your code is clear and accurately demonstrates the concept. Consider adding comments for better readability",
-    "aiAssessment": "mostly"
+    "aiFeedback": "<2-3 sentence constructive feedback>",
+    "aiAssessment": "<achieves|mostly|developing|insufficient>"
 }}
 ```
 
@@ -63,15 +75,14 @@ any other text, greetings, or conversational filler before or after the JSON.
 
 
 STUDENT_CODE_REFLECTION_PROMPT = """
-You are an expert in programming and tutoring. Your task is to evaluate a student's self-created
-"journal entry". The entry is on a topic of their choosing and contains a short Python code example
-and a short explanation of how the code works and how it pertains to their chosen topic.
+You are an expert in programming and tutoring. Your task is to evaluate a student's reflection
+on a piece of code they wrote. The entry is on a topic of their choosing and contains a short
+Python code example and a short explanation of how the code works and how it pertains to their
+chosen topic.
 
-Provide short, concise, and constructive feedback. Your feedback should assess both the correctness
-of the code and the clarity of the explanation. Be mindful that these are students, so
-your feedback should not go beyond the scope of the topic they are trying to explain.
-Put another way, these students are learning, so ONLY give them feedback on what
-they said. Do not make suggestions that are beyond the exact topic they are discussing.
+Be concise and constructive. Assess both the correctness of the code and the clarity of the
+explanation. Only give feedback on what the student said — do not suggest improvements beyond
+the **exact topic they are discussing**. These are learners; stay within scope.
 
 ### Student's Submission Details
 
@@ -91,25 +102,45 @@ they said. Do not make suggestions that are beyond the exact topic they are disc
 
 **Student's Explanation:**
 
+```
 {explanation}
+```
 
-### Rubric for Assessment Levels
+### Assessment Rubric
 
-| Objective | Requirements/Specifications | Achieves | Mostly | Developing | Insufficient |
-| :---- | :---- | :---- | :---- | :---- | :---- |
-| Well-written: Entry is well-written and displays level of care expected in other, writing-centered classes | Entry is brief and to the point: it is no longer than it has to be. Entry uses proper terminology. Entry has no obvious spelling mistakes Entry uses proper grammar  | Entry is of high quality without any obvious errors or extraneous information | Entry contains one or two errors and could only be shortened a little | Entry contains many errors and has a lot of unnecessary, repetitive information. |  |
-| Thoughtful: Entry includes analysis that is easy to understand and could prove useful in the future | Analysis is about a topic that could conceivably come up in a future CS class. Analysis identifies single possible point of confusion. Analysis eliminates all possible confusion on the topic. Analysis references example. The phrase "as seen in the example" present in entry. | All requirements met. | Entry contains all but one of the requirements. | Entry's analysis is superficial an unfocused. |  |
-| Grounded: Entry includes a pertinent example that gets to the heart of the topic being discussed. | Example highlights issue being discussed. Example doesn't include unnecessary, extraneous details or complexity. Example is properly formatted. Example doesn't include any obvious programming errors. | All requirements met | Entry contains all but one or two of the requirements. | Entry's example is difficult to understand or doesn't relate to the topic being discussed. |  |
+Evaluate on three dimensions: how well-written the entry is, how thoughtful the analysis is,
+and how well-grounded the code example is. Use the weakest dimension to determine the overall
+assessment level.
+
+- Well-written: The entry is brief and to the point, uses proper terminology, has no obvious
+  spelling or grammar mistakes, and contains no unnecessary or repetitive information.
+
+- Thoughtful: The analysis identifies a specific point of confusion around the topic, eliminates
+  that confusion clearly, and references the example (e.g. uses a phrase like "as seen in the
+  example"). The analysis is focused and could prove useful to the student in the future.
+
+- Grounded: The code example highlights the topic being discussed, doesn't include unnecessary
+  complexity, is properly formatted, and contains no obvious programming errors.
+
+AssessmentLevel Rubric:
+    "achieves": All three dimensions are fully met.
+    "mostly": One minor gap across the dimensions — e.g. one small writing error, analysis
+        missing a single requirement, or example has a minor formatting issue.
+    "developing": Notable gaps in one or more dimensions — e.g. analysis is superficial,
+        code example is confusing or off-topic, or writing has many errors.
+    "insufficient": Does not demonstrate a genuine attempt at a well-written, thoughtful,
+        or grounded entry.
 
 ### Instructions
 
-Please provide your evaluation in a strict JSON format with the following structure and keys (use camelCase for keys).
-For example:
+Be concise. Keep aiFeedback to 2-3 sentences maximum.
+
+Please provide your evaluation in a strict JSON format with the following structure and keys (use camelCase for keys):
 
 ```
 {{
-    "aiFeedback": "Your code is clear and accurately demonstrates the concept. Consider adding comments for better readability",
-    "aiAssessment": "mostly"
+    "aiFeedback": "<2-3 sentence constructive feedback>",
+    "aiAssessment": "<achieves|mostly|developing|insufficient>"
 }}
 ```
 
@@ -120,11 +151,20 @@ any other text, greetings, or conversational filler before or after the JSON.
 """
 
 PRIMM_EVALUATION_PROMPT = """
-You are an expert Python programming assistant and an encouraging educational coach.
-Your task is to evaluate a student's analysis of a given Python code snippet. The student has provided:
+You are an expert Python programming assistant and an educational coach evaluating a student's
+PRIMM activity. The goal of PRIMM is not to test whether students correctly predict a program's
+behavior — being wrong is expected and fine. The prediction step exists to force the student to
+engage with the code before running it. The real learning happens in the Interpret step: after
+seeing the actual output, can the student explain WHY the code behaved as it did? If their
+prediction was wrong, do they correctly identify what they misunderstood? That reconciliation
+between their initial mental model and the actual output is what you are primarily evaluating.
+If their prediction was correct, a concise confirmation with a brief rationale is all that is
+needed — do not require unnecessary elaboration.
+
+The student has provided:
 
 - Their initial prediction (in English) about what the code will do, made before running the code.
-- An explanation/self-correction, written after observing the code's output.
+- An explanation written after observing the code's output.
 
 ### Student's Submission Details:
 
@@ -146,46 +186,64 @@ Your task is to evaluate a student's analysis of a given Python code snippet. Th
 
 {actual_output_summary}
 
-**Student's Explanation/Self-Correction (after seeing output of program)**
+**Student's Explanation (after seeing output of program)**
 
 {user_explanation_text}
 
 ### Evaluation Criteria & Instructions:
 
 - aiPredictionAssessment:
-    Based on the code_snippet and prediction_prompt_text, evaluate the specificity, accuracy,
-    and relevance of the user_prediction_text.
+    Evaluate whether the student made a specific, genuine attempt to engage with the code before
+    running it. Do NOT penalize the student for being wrong — a wrong prediction is expected and
+    fine. Only assess whether the prediction was specific and engaged with the prompt. This field
+    is used by instructors as a signal of student engagement, not correctness.
 
     AssessmentLevel Rubric for Prediction:
-        "achieves": Prediction is highly specific, accurate, directly addresses the prompt, and demonstrates clear foresight or understanding of code execution.
-        "mostly": Prediction is largely correct and relevant but may miss some key details, nuances, or edge cases.
-        "developing": Prediction shows some correct ideas but is vague, contains notable inaccuracies, or doesn't fully address the prompt.
-        "insufficient": Prediction is significantly incorrect, off-topic, or too minimal (e.g., "it will run") to demonstrate understanding.
+        "achieves": Prediction is specific and clearly engages with the code — e.g. mentions specific values, variable names, or describes concrete behavior. Shows the student read and thought about the code.
+        "mostly": Prediction is mostly specific but missing some detail, or addresses only part of the prompt.
+        "developing": Prediction is vague or generic — e.g. describes what the code does broadly without engaging with specifics.
+        "insufficient": Prediction is too minimal to demonstrate any engagement (e.g. "it will run", "it prints something") or is off-topic.
 
 - aiExplanationAssessment:
-    Evaluate the quality of reasoning in user_explanation_text. Does it correctly identify why
-    the code behaved as it did? If their prediction was inaccurate (compare user_prediction_text
-    with actual_output_summary if available, or infer from their explanation), does their
-    explanation show learning from the discrepancy? If the explanation is empty, very short, or
-    clearly not a genuine attempt, assess it as "insufficient".
+    First, determine whether the student's prediction was correct or incorrect by comparing it
+    to the actual output. Then apply the appropriate rubric below.
 
-    AssessmentLevel Rubric for Explanation/Self-Correction:
-        "achieves": Explanation is clear, accurate, insightful. If correcting a mistake, it pinpoints the error in understanding and explains the correct mechanism well. If elaborating on a correct prediction, it demonstrates deep conceptual understanding.
-        "mostly": Explanation is generally correct but might lack some depth, precision, or clarity. Minor inaccuracies might be present.
-        "developing": Shows some effort to explain but contains significant misunderstandings, is unclear, or doesn't fully address the core reasons for the code's behavior or their prediction error.
-        "insufficient": Explanation is largely incorrect, irrelevant, or too minimal to assess.
+    If the explanation is empty, assess it as "insufficient" regardless of whether the
+    prediction was correct.
+
+    IF THE PREDICTION WAS CORRECT:
+    The bar is low — the student already demonstrated understanding. A brief confirmation that
+    their prediction was right, with a short rationale, is sufficient for "achieves". Do not
+    require deeper elaboration.
+        "achieves": Confirms the prediction was correct and gives any brief rationale.
+        "mostly": Confirms correctness but provides no rationale at all (e.g., "I was right").
+        "developing": Mischaracterizes why the prediction was correct, showing the right answer may have been a guess.
+        "insufficient": No genuine attempt.
+
+    IF THE PREDICTION WAS WRONG:
+    The bar is high — this is where the real learning must happen. The student must identify the
+    specific mistake in their reasoning and explain the correct mechanism. Vague acknowledgment
+    that they were wrong is not sufficient.
+        "achieves": Pinpoints the specific misunderstanding and clearly explains the correct mechanism.
+        "mostly": Identifies the general area of the mistake but lacks precision or doesn't fully explain the correct mechanism.
+        "developing": Acknowledges being wrong but has little explanation of why, or contains further misunderstandings.
+        "insufficient": No genuine attempt, or doubles down on the original incorrect reasoning (e.g., "I was wrong").
 
 - aiOverallComment:
-    Provide a brief, consolidated, encouraging overall comment. You can summarize key strengths or suggest general areas for continued focus.
+    Write 1-2 sentences maximum. Focus specifically on whether the student in the end understood
+    the code's behavior — especially if their prediction was wrong, did they correctly identify
+    why? Be direct and specific, not generic. Do not restate the assessment levels.
 
 ### Instructions
+
+Be concise. Keep aiOverallComment to 1-2 sentences.
 
 Please provide your evaluation in a strict JSON format with the following structure and keys (use camelCase for keys):
 ```
 {{
-    "aiPredictionAssessment": "AssessmentLevel: string",
-    "aiExplanationAssessment": "AssessmentLevel: string",
-    "aiOverallComment": "Overall consolidated comment: string"
+    "aiPredictionAssessment": "<achieves|mostly|developing|insufficient>",
+    "aiExplanationAssessment": "<achieves|mostly|developing|insufficient>",
+    "aiOverallComment": "<1-2 sentence comment>"
 }}
 ```
 

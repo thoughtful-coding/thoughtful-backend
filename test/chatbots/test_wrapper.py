@@ -27,7 +27,7 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_student_code() -> None:
 
     assert "**Student's Chosen Topic:** For Loops" in prompt
     assert "```python\nfor i in range\n```" in prompt
-    assert "**Student's Explanation:**\n\nAround\n" in prompt
+    assert "**Student's Explanation:**\n\n```\nAround\n```" in prompt
 
 
 def test_chatbot_wrapper_gen_reflection_feedback_prompt_predefined_code() -> None:
@@ -168,7 +168,7 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_with_extra_context_stude
 
     assert "**Student's Chosen Topic:** While Loops" in prompt
     assert "```python\nwhile True: break\n```" in prompt
-    assert "**Student's Explanation:**\n\nThis creates an infinite loop and breaks immediately\n" in prompt
+    assert "**Student's Explanation:**\n\n```\nThis creates an infinite loop and breaks immediately\n```" in prompt
     assert "**Context of Where the Student Is/What They Know:**" in prompt
     assert "Pay special attention to edge cases and readability." in prompt
 
@@ -188,7 +188,7 @@ def test_chatbot_wrapper_gen_reflection_feedback_prompt_without_extra_context() 
 
     assert "**Student's Chosen Topic:** For Loops" in prompt
     assert "```python\nfor i in range\n```" in prompt
-    assert "**Student's Explanation:**\n\nAround\n" in prompt
+    assert "**Student's Explanation:**\n\n```\nAround\n```" in prompt
     assert "**Context of Where the Student Is/What They Know:**" in prompt
 
 
