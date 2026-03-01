@@ -22,7 +22,8 @@ class InputValidator:
 
     # Maximum lengths for different input types
     MAX_LENGTHS = {
-        "topic": 200,
+        "topic": 500,
+        "prompt": 1000,
         "code": 5000,
         "explanation": 2000,
         "extra_context": 1000,
@@ -81,7 +82,7 @@ class InputValidator:
         cls.validate_field(code_snippet, "code")
         cls.validate_field(user_prediction_text, "prediction")
         cls.validate_field(user_explanation_text, "explanation")
-        cls.validate_field(prediction_prompt_text, "topic")
+        cls.validate_field(prediction_prompt_text, "prompt")
 
         if actual_output_summary:
             cls.validate_field(actual_output_summary, "output_summary")

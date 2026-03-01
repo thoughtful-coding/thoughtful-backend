@@ -43,9 +43,9 @@ class TestInputValidatorLengthLimits:
     """Test length validation"""
 
     def test_topic_too_long(self):
-        """Topic exceeding 200 chars should be rejected"""
+        """Topic exceeding 500 chars should be rejected"""
         with pytest.raises(SuspiciousInputError, match="exceeds maximum length"):
-            InputValidator.validate_field("A" * 201, "topic")
+            InputValidator.validate_field("A" * 501, "topic")
 
     def test_code_too_long(self):
         """Code exceeding 5000 chars should be rejected"""
@@ -168,6 +168,15 @@ class TestInputValidatorConsecutiveSpecialChars:
         )
         InputValidator.validate_field(traceback, "output_summary")
 
+    def test_long_prediction_prompt_allowed(self):
+        """Instructor-written prediction prompts longer than 200 chars should pass"""
+        InputValidator.validate_field(
+            "The two print statements above will print out different things. This is because in one case the `+` is "
+            "operating on **integers** and in the other case the `+` is operating on **strings**. What do you think "
+            "will happen when you run the code?",
+            "prompt",
+        )
+
     def test_caret_underlines_still_blocked_in_explanation(self):
         """Long ^^^ sequences should still be blocked in user-written fields"""
         with pytest.raises(SuspiciousInputError, match="unusual character sequences"):
@@ -238,7 +247,8 @@ class TestInputValidatorLimitsDocumented:
     def test_input_max_lengths(self):
         """All input field length limits in one place."""
         assert InputValidator.MAX_LENGTHS == {
-            "topic": 200,
+            "topic": 500,
+            "prompt": 1000,
             "code": 5000,
             "explanation": 2000,
             "extra_context": 1000,
@@ -254,7 +264,7 @@ class TestInputValidatorLimitsDocumented:
 
     def test_all_input_fields_have_length_limits(self):
         """Every field type used in validate_primm_input and validate_reflection_input has a limit."""
-        required_fields = {"topic", "code", "explanation", "extra_context", "prediction", "output_summary"}
+        required_fields = {"topic", "prompt", "code", "explanation", "extra_context", "prediction", "output_summary"}
         assert required_fields == set(InputValidator.MAX_LENGTHS.keys())
 
     def test_each_field_rejects_over_limit(self):
