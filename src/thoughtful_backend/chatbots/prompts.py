@@ -163,13 +163,11 @@ Your task is to evaluate a student's analysis of a given Python code snippet. Th
         "insufficient": Prediction is significantly incorrect, off-topic, or too minimal (e.g., "it will run") to demonstrate understanding.
 
 - aiExplanationAssessment:
-    This part is only applicable if user_explanation_text is provided and meaningful. If
-    user_explanation_text is empty, very short, or clearly not an attempt at explanation/
-    correction, set explanationAssessment to null and omit explanationFeedback. Evaluate the
-    quality of reasoning in user_explanation_text. Does it correctly identify why the code
-    behaved as it did? If their prediction was inaccurate (compare user_prediction_text with
-    actual_output_summary if available, or infer from their explanation), does their explanation
-    show learning from the discrepancy?
+    Evaluate the quality of reasoning in user_explanation_text. Does it correctly identify why
+    the code behaved as it did? If their prediction was inaccurate (compare user_prediction_text
+    with actual_output_summary if available, or infer from their explanation), does their
+    explanation show learning from the discrepancy? If the explanation is empty, very short, or
+    clearly not a genuine attempt, assess it as "insufficient".
 
     AssessmentLevel Rubric for Explanation/Self-Correction:
         "achieves": Explanation is clear, accurate, insightful. If correcting a mistake, it pinpoints the error in understanding and explains the correct mechanism well. If elaborating on a correct prediction, it demonstrates deep conceptual understanding.
