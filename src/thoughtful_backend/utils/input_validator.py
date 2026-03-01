@@ -41,6 +41,8 @@ class InputValidator:
 
     # Maximum consecutive special characters
     MAX_CONSECUTIVE_SPECIAL_CHARS = 10
+    # Higher limit for structured/machine-generated fields (e.g. tracebacks with ^^^)
+    MAX_CONSECUTIVE_SPECIAL_CHARS_STRUCTURED = 200
 
     @classmethod
     def validate_reflection_input(
@@ -128,6 +130,12 @@ class InputValidator:
                 raise SuspiciousInputError(f"{field_name} contains too many code block markers")
 
         # 5. Consecutive special characters (obfuscation/injection attempts)
+        # Structured fields (code, output_summary) use a higher limit to allow tracebacks with ^^^
+        consecutive_limit = (
+            cls.MAX_CONSECUTIVE_SPECIAL_CHARS_STRUCTURED
+            if field_name in ("code", "output_summary")
+            else cls.MAX_CONSECUTIVE_SPECIAL_CHARS
+        )
         max_consecutive = 0
         current_consecutive = 0
         for char in text:
@@ -137,7 +145,7 @@ class InputValidator:
             else:
                 current_consecutive = 0
 
-        if max_consecutive > cls.MAX_CONSECUTIVE_SPECIAL_CHARS:
+        if max_consecutive > consecutive_limit:
             _LOGGER.warning(f"Excessive consecutive special chars in {field_name}: {max_consecutive}")
             raise SuspiciousInputError(f"{field_name} contains unusual character sequences")
 
